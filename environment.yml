@@ -1,0 +1,10 @@
+name: tm5
+channels:
+  - defaults
+dependencies:
+  - python=3.12
+  - numpy
+  - pillow
+  - pip
+  - pip:
+      - mujoco>=3.11

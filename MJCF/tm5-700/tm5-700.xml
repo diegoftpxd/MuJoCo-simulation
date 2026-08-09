@@ -1,0 +1,174 @@
+<mujoco model="tm5-700">
+  <!-- ================================================================
+       Modelo MuJoCo del brazo robotico Techman TM5-700 (6 GDL).
+       Convertido desde tm5-700-nominal.urdf (tmr_ros2/tm_description).
+       Las mallas se comparten con el modelo tm5-900 salvo arm1/arm2.
+       ================================================================ -->
+
+  <compiler angle="radian" eulerseq="XYZ"
+            meshdir="meshes" autolimits="true"/>
+
+  <option integrator="implicitfast" gravity="0 0 -9.81"/>
+
+  <visual>
+    <global offwidth="1280" offheight="960"/>
+    <quality shadowsize="4096"/>
+  </visual>
+
+  <default>
+    <default class="tm5">
+      <joint axis="0 0 1" damping="1.0" armature="0.1"/>
+      <default class="visual">
+        <geom type="mesh" contype="0" conaffinity="0" group="2" material="tm_grey"/>
+      </default>
+      <default class="collision">
+        <geom type="mesh" group="3" rgba="0.8 0.4 0.1 0.4"/>
+      </default>
+      <!-- Actuadores de posicion: rigidez alta para seguir bien la referencia
+           contra la gravedad (poco error estacionario). -->
+      <position kp="2000" kv="150" forcerange="-157 157"/>
+    </default>
+  </default>
+
+  <asset>
+    <material name="tm_grey"  rgba="0.75 0.75 0.75 1.0"/>
+    <material name="tm_white" rgba="0.95 0.95 0.95 1.0"/>
+    <material name="tm_dark"  rgba="0.25 0.25 0.25 1.0"/>
+
+    <!-- Mallas visuales (STL). Se usan las STL, no las OBJ: varios OBJ de
+         este paquete estan exportados en un frame rotado que NO coincide con
+         el URDF (arm1, arm2, tmr_400w...). Las STL visuales si estan en el
+         frame correcto (coinciden con las de colision). -->
+    <mesh name="base_v"  file="tm5-900/visual/tm5-base.stl"/>
+    <mesh name="l1_v"    file="tm5-900/visual/tmr_400w_01.stl"/>
+    <mesh name="l2_v"    file="tm5-700/visual/tm5-700_arm1.stl"/>
+    <mesh name="l3_v"    file="tm5-700/visual/tm5-700_arm2.stl"/>
+    <mesh name="l4_v"    file="tm5-900/visual/tmr_100w_01.stl"/>
+    <mesh name="l5_v"    file="tm5-900/visual/tmr_100w_02.stl"/>
+    <mesh name="l6_v"    file="tm5-900/visual/tmr_ee.stl"/>
+
+    <!-- Mallas de colision (STL, tratadas como casco convexo) -->
+    <mesh name="base_c"  file="tm5-900/collision/tm5-base_c.stl"/>
+    <mesh name="l1_c"    file="tm5-900/collision/tmr_400w_01_c.stl"/>
+    <mesh name="l2_c"    file="tm5-700/collision/tm5-700_arm1_c.stl"/>
+    <mesh name="l3_c"    file="tm5-700/collision/tm5-700_arm2_c.stl"/>
+    <mesh name="l4_c"    file="tm5-900/collision/tmr_100w_01_c.stl"/>
+    <mesh name="l5_c"    file="tm5-900/collision/tmr_100w_02_c.stl"/>
+    <mesh name="l6_c"    file="tm5-900/collision/tmr_ee_c.stl"/>
+
+    <!-- Suelo -->
+    <texture name="grid" type="2d" builtin="checker" rgb1="0.2 0.3 0.4" rgb2="0.1 0.15 0.2"
+             width="512" height="512"/>
+    <material name="grid" texture="grid" texrepeat="8 8" reflectance="0.1"/>
+  </asset>
+
+  <worldbody>
+    <light name="top" pos="0 0 2.5" dir="0 0 -1" diffuse="0.8 0.8 0.8"/>
+    <light name="side" pos="1.5 -1.5 1.5" dir="-1 1 -1" diffuse="0.4 0.4 0.4"/>
+    <geom name="floor" type="plane" size="0 0 0.05" material="grid"/>
+
+    <!-- ===================== Brazo TM5-700 ===================== -->
+    <body name="link_0" pos="0 0 0" childclass="tm5">
+      <geom class="visual" mesh="base_v" material="tm_white"/>
+      <geom class="collision" mesh="base_c"/>
+
+      <body name="link_1" pos="0 0 0.1452">
+        <inertial pos="0 0 0" mass="4.032"
+                  diaginertia="0.008800119 0.011548982 0.011970081"/>
+        <joint name="joint_1" range="-4.71238898 4.71238898"/>
+        <geom class="visual" mesh="l1_v"/>
+        <geom class="collision" mesh="l1_c"/>
+
+        <body name="link_2" pos="0 0 0" euler="-1.570796 -1.570796 0">
+          <inertial pos="0 0 0" mass="8.567"
+                    diaginertia="0.023552072 0.19825197 0.20459254"/>
+          <joint name="joint_2" range="-3.14159265 3.14159265"/>
+          <geom class="visual" mesh="l2_v"/>
+          <geom class="collision" mesh="l2_c"/>
+
+          <body name="link_3" pos="0.329 0 0">
+            <inertial pos="0 0 0" mass="2.273"
+                      diaginertia="0.003380181 0.033829144 0.034328203"/>
+            <joint name="joint_3" range="-2.70526034 2.70526034"/>
+            <geom class="visual" mesh="l3_v"/>
+            <geom class="collision" mesh="l3_c"/>
+
+            <body name="link_4" pos="0.3115 0 -0.1223" euler="0 0 1.570796">
+              <inertial pos="0 0 0" mass="1.576"
+                        diaginertia="0.002058405 0.002563079 0.00264321"/>
+              <joint name="joint_4" range="-3.14159265 3.14159265"/>
+              <geom class="visual" mesh="l4_v"/>
+              <geom class="collision" mesh="l4_c"/>
+
+              <body name="link_5" pos="0 -0.106 0" euler="1.570796 0 0">
+                <inertial pos="0 0 0" mass="1.576"
+                          diaginertia="0.002058405 0.002563079 0.00264321"/>
+                <joint name="joint_5" range="-3.14159265 3.14159265"/>
+                <geom class="visual" mesh="l5_v"/>
+                <geom class="collision" mesh="l5_c"/>
+
+                <body name="link_6" pos="0 -0.11315 0" euler="1.570796 0 0">
+                  <inertial pos="0 0 0" mass="0.65"
+                            diaginertia="0.000774544 0.001383811 0.001559496"/>
+                  <joint name="joint_6" range="-4.71238898 4.71238898"/>
+                  <geom class="visual" mesh="l6_v" material="tm_dark"/>
+                  <geom class="collision" mesh="l6_c"/>
+                  <!-- Brida / efector final (TCP) -->
+                  <site name="flange" pos="0 0 0" size="0.01" rgba="1 0 0 1"/>
+
+                  <!-- ============ Pinza paralela simple (2 dedos) ============ -->
+                  <!-- Se abre/cierra a lo largo del eje X local; la direccion
+                       de aproximacion es el eje Z local de la brida. -->
+                  <body name="gripper_base" pos="0 0 0">
+                    <geom class="visual" type="box" size="0.028 0.028 0.012"
+                          pos="0 0 0.012" material="tm_dark"/>
+                    <!-- Punto central de agarre (TCP) entre los dedos -->
+                    <site name="tcp" pos="0 0 0.055" size="0.008" rgba="0 1 0 1"/>
+                    <body name="finger_left" pos="0 0 0.024">
+                      <inertial pos="0.018 0 0.025" mass="0.05"
+                                diaginertia="1e-5 1e-5 1e-5"/>
+                      <joint name="gripper_left" type="slide" axis="1 0 0"
+                             range="0 0.03" damping="10"/>
+                      <geom class="visual" type="box" size="0.006 0.012 0.025"
+                            pos="0.018 0 0.025" material="tm_grey"/>
+                      <geom class="collision" type="box" size="0.006 0.012 0.025"
+                            pos="0.018 0 0.025"/>
+                    </body>
+                    <body name="finger_right" pos="0 0 0.024">
+                      <inertial pos="-0.018 0 0.025" mass="0.05"
+                                diaginertia="1e-5 1e-5 1e-5"/>
+                      <joint name="gripper_right" type="slide" axis="-1 0 0"
+                             range="0 0.03" damping="10"/>
+                      <geom class="visual" type="box" size="0.006 0.012 0.025"
+                            pos="-0.018 0 0.025" material="tm_grey"/>
+                      <geom class="collision" type="box" size="0.006 0.012 0.025"
+                            pos="-0.018 0 0.025"/>
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <position class="tm5" name="act_1" joint="joint_1" ctrlrange="-4.71238898 4.71238898"/>
+    <position class="tm5" name="act_2" joint="joint_2" ctrlrange="-3.14159265 3.14159265"/>
+    <position class="tm5" name="act_3" joint="joint_3" ctrlrange="-2.70526034 2.70526034"/>
+    <position class="tm5" name="act_4" joint="joint_4" ctrlrange="-3.14159265 3.14159265" forcerange="-43 43"/>
+    <position class="tm5" name="act_5" joint="joint_5" ctrlrange="-3.14159265 3.14159265" forcerange="-43 43"/>
+    <position class="tm5" name="act_6" joint="joint_6" ctrlrange="-4.71238898 4.71238898" forcerange="-43 43"/>
+    <!-- Actuadores de la pinza: ctrl = apertura (m). 0 = cerrada, 0.03 = abierta -->
+    <position name="act_grip_left"  joint="gripper_left"  kp="80" kv="8" ctrlrange="0 0.03" forcerange="-40 40"/>
+    <position name="act_grip_right" joint="gripper_right" kp="80" kv="8" ctrlrange="0 0.03" forcerange="-40 40"/>
+  </actuator>
+
+  <keyframe>
+    <!-- Pose "home": brazo levantado y pinza abierta -->
+    <key name="home" qpos="0 0 1.5708 0 1.5708 0 0.03 0.03"
+         ctrl="0 0 1.5708 0 1.5708 0 0.03 0.03"/>
+  </keyframe>
+</mujoco>

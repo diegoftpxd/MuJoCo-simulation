@@ -1,0 +1,34 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# --- Entornos virtuales ---
+.venv/
+venv/
+env/
+.env
+
+# --- Salidas generadas (imagenes/videos) ---
+# Se ignora todo lo de output/ salvo la vista previa usada en el README.
+output/*
+!output/preview.png
+*.mp4
+*.gif
+
+# --- Pesos de modelos / cache de HuggingFace (no versionar, son GB) ---
+hf_cache/
+*.safetensors
+*.bin
+*.pt
+*.ckpt
+
+# --- Editores / Sistema operativo ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
