@@ -21,13 +21,14 @@ class TM5(RobotArm):
     END_EFFECTOR_SITE = "tcp"       # sitio del efector final (punto de agarre de la pinza)
     HOME_KEY = "home"     # keyframe de arranque
 
-    def __init__(self):
+    def __init__(self, objects=None):
         if self.MODEL is None:
             raise NotImplementedError(
                 "Define el atributo MODEL en la subclase concreta de TM5."
             )
         xml = os.path.join(MJCF_DIR, self.MODEL, f"{self.MODEL}.xml")
-        super().__init__(xml, end_effector_site=self.END_EFFECTOR_SITE, home_key=self.HOME_KEY)
+        super().__init__(xml, end_effector_site=self.END_EFFECTOR_SITE,
+                         home_key=self.HOME_KEY, objects=objects)
 
 
 @RobotFactory.register("tm5-700")

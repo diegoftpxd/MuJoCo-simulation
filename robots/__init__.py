@@ -2,10 +2,14 @@
 Paquete de robots.
 
 Estructura:
-    base.py     -> RobotArm (clase base generica) + MJCF_DIR
-    factory.py  -> RobotFactory (registro y creacion por nombre) + make_robot
-    tm5.py      -> familia TM5 (TM5_700, ...)
-    panda.py    -> Franka Emika Panda
+    base.py       -> RobotArm (clase base generica) + MJCF_DIR
+    control.py    -> CartesianController (IK, movimiento por Δpose)
+    structures.py -> PoseDelta / Pose / Frame / CartesianAction
+    factory.py    -> RobotFactory (registro y creacion por nombre) + make_robot
+    tm5.py        -> familia TM5 (TM5_700, ...)
+    panda.py      -> Franka Emika Panda
+
+Los objetos del entorno (cubos, esferas, ...) viven en el paquete `objects`.
 
 Al importar este paquete se cargan los modulos de cada robot, lo que dispara su
 registro en `RobotFactory`. Para agregar un robot: crea su archivo con una clase

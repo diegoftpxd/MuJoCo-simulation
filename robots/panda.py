@@ -20,6 +20,7 @@ class Panda(RobotArm):
 
     XML = os.path.join(MJCF_DIR, "panda", "scene.xml")
 
-    def __init__(self):
-        super().__init__(self.XML, end_effector_body="hand", end_effector_offset=(0, 0, 0.1034),
-                         home_key="home")
+    def __init__(self, objects=None):
+        super().__init__(self.XML, end_effector_body="hand",
+                         end_effector_offset=(0, 0, 0.1034), home_key="home",
+                         objects=objects)

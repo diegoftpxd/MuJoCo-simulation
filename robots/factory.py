@@ -26,13 +26,18 @@ class RobotFactory:
         return decorator
 
     @classmethod
-    def create(cls, name):
-        """Crea una instancia del robot registrado como `name`."""
+    def create(cls, name, **kwargs):
+        """
+        Crea una instancia del robot registrado como `name`.
+
+        Los `**kwargs` se pasan al constructor del robot; por ejemplo
+        `RobotFactory.create("panda", objects=[Cube(...)])`.
+        """
         if name not in cls._registry:
             raise KeyError(
                 f"Robot '{name}' desconocido. Disponibles: {cls.available()}"
             )
-        return cls._registry[name]()
+        return cls._registry[name](**kwargs)
 
     @classmethod
     def available(cls):
@@ -40,6 +45,6 @@ class RobotFactory:
         return sorted(cls._registry)
 
 
-def make_robot(name="tm5-700"):
-    """Atajo para `RobotFactory.create(name)`."""
-    return RobotFactory.create(name)
+def make_robot(name="tm5-700", **kwargs):
+    """Atajo para `RobotFactory.create(name, **kwargs)`."""
+    return RobotFactory.create(name, **kwargs)

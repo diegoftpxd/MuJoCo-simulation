@@ -29,7 +29,8 @@ class RobotArm:
     """El robot: modelo, estado articular, control y cinematica."""
 
     def __init__(self, xml_path, end_effector_site=None, end_effector_body=None, end_effector_offset=(0, 0, 0),
-                 home_key="home", gripper_markers=("gripper", "finger")):
+                 home_key="home", gripper_markers=("gripper", "finger"),
+                 objects=None):
         """
         Parametros
         ----------
@@ -51,9 +52,16 @@ class RobotArm:
             Subcadenas que identifican las articulaciones de la pinza por su
             nombre (p. ej. "gripper", "finger"). Sirven para separar el brazo
             de la pinza automaticamente.
+        objects : list[SceneObject] | None
+            Objetos a agregar al entorno (cubos, esferas, ...). Se insertan en
+            el modelo antes de compilar. Quedan accesibles en `self.objects`.
         """
         self.xml_path = os.path.abspath(xml_path)
-        self.model = mujoco.MjModel.from_xml_path(self.xml_path)
+        objects = list(objects) if objects else []
+        if objects:
+            self.model = self._build_model_with_objects(self.xml_path, objects)
+        else:
+            self.model = mujoco.MjModel.from_xml_path(self.xml_path)
         self.data = mujoco.MjData(self.model)
         self.home_key = home_key
         self.gripper_markers = tuple(gripper_markers)
@@ -127,7 +135,37 @@ class RobotArm:
             a for a in range(self.model.nu) if a not in _arm_actuators
         ]
 
+        # --- Objetos del entorno ---
+        # Enlaza cada objeto al modelo ya compilado; acceso por nombre.
+        self.objects = {}
+        for obj in objects:
+            obj.bind(self.model, self.data)
+            self.objects[obj.name] = obj
+
         self.reset()
+
+    @staticmethod
+    def _build_model_with_objects(xml_path, objects):
+        """
+        Compila el modelo agregando `objects` al mundo, via `mujoco.MjSpec`.
+
+        Los objetos deben existir antes de compilar; ademas, si aportan un free
+        joint (son movibles), se extiende el qpos de cada keyframe con su pose
+        inicial para que las poses guardadas sigan siendo validas.
+        """
+        spec = mujoco.MjSpec.from_file(xml_path)
+        extra_qpos, extra_qvel = [], []
+        for obj in objects:
+            obj.add_to_spec(spec)
+            extra_qpos += obj.init_qpos
+            extra_qvel += [0.0] * obj.n_dof
+        if extra_qpos:
+            for key in spec.keys:
+                if len(key.qpos):
+                    key.qpos = list(key.qpos) + extra_qpos
+                if len(key.qvel):
+                    key.qvel = list(key.qvel) + extra_qvel
+        return spec.compile()
 
     @property
     def has_gripper(self):
