@@ -38,5 +38,8 @@ Thumbs.db
 desktop.ini
 
 
+# Evitar subir logs
+slurm/
+
 
 

@@ -10,7 +10,7 @@
 #SBATCH --output=slurm/logs/%x_%j.log  # Nombre del output (%x=nombre del trabajo, %j=ID del trabajo)
 #SBATCH --time=1:00:00                 # Tiempo limite del trabajo. Importante definirlo para no
                                        # mantener recursos ocupados si olvidas cerrar el servidor
-#SBATCH --gres=gpu:1                  # Solicitar una GPU de ser necesario (descomentar si se necesita)
+#SBATCH --gres=gpu:2                  # Solicitar una GPU de ser necesario (descomentar si se necesita)
 pwd; hostname; date
 
 # Activa tu entorno de conda
