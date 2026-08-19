@@ -1,8 +1,10 @@
 # Dependencias de GPU para correr OpenVLA + LIBERO en el cluster.
 #
-# 1) torch se instala APARTE, segun la CUDA del cluster (1080Ti/2080Ti van bien
-#    con cu118). Ejemplo:
-#       pip install torch --index-url https://download.pytorch.org/whl/cu118
+# 1) torch (+ torchvision, que necesita timm) se instalan APARTE, segun la CUDA
+#    del cluster (1080Ti/2080Ti van bien con cu118). Ejemplo:
+#       pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+#    IMPORTANTE: usa un torch compatible con NumPy 1.x (ver numpy<2 abajo). torch
+#    2.2.x es lo que prueba OpenVLA; con torch muy nuevo verifica que carga bien.
 #
 # 2) LIBERO (robosuite, bddl, ...) se instala desde el repo incluido:
 #       pip install -r benchmarks/libero/Libero-10-r/requirements.txt
@@ -15,14 +17,24 @@
 
 # --- Stack OpenVLA (versiones fijadas por el codigo remoto del modelo) ---
 transformers==4.40.1
-tokenizers==0.19.1        # el rango que exige transformers 4.40.1
-huggingface_hub==0.23.5
+tokenizers==0.19.1        # rango que exige transformers 4.40.1 (>=0.19,<0.20)
+huggingface_hub==0.23.5   # transformers 4.40 se rompe con hub >=0.26
 timm==0.9.10
-accelerate
+accelerate>=0.25,<1.0     # device_map="auto"; accelerate 1.x no esta probado con transformers 4.40
 hf_transfer
 
-# --- Simulacion + render headless (mismo que requirements.txt) ---
-mujoco>=3.11
-numpy
+# --- Compatibilidad de LIBERO ---
+# LIBERO usa la API de robosuite 1.4.x (clase SingleArmEnv). robosuite 1.5+ la
+# elimino, asi que hay que fijar 1.4.x. Va aqui (se instala al final) para que
+# gane sobre el robosuite mas nuevo que arrastra el requirements.txt de LIBERO.
+robosuite==1.4.1
+
+# --- Simulacion + render headless ---
+# OJO: robosuite 1.4.1 (el que usa LIBERO) NO es compatible con mujoco 3.x; con
+# 3.x falla con "'MjData' object has no attribute 'qM'". Hay que fijar 2.3.x.
+# Esto DIFIERE a proposito de requirements.txt, que usa mujoco 3.x para la
+# feature de objetos via MjSpec (no se usa en los experimentos de LIBERO).
+mujoco==2.3.2
+numpy<2                  # mujoco 2.3.2 y robosuite 1.4 no soportan NumPy 2.0
 imageio
 imageio-ffmpeg
