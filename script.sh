@@ -26,13 +26,20 @@ conda activate openvla
 # AL FINAL: asi los pines de requirements-vla.txt (transformers 4.40.1, etc.)
 # tienen la ultima palabra y no quedan degradados.
 
-# 1) LIBERO + robosuite (motor de simulación). requirements.txt trae robosuite;
+# 1) torch + torchvision segun la GPU del cluster. Build cu130 (CUDA 13) para
+#    GPUs nuevas (Blackwell). Ajusta el index-url si tu CUDA es otra.
+pip install -q torch torchvision --index-url https://download.pytorch.org/whl/cu130
+
+# 2) LIBERO + robosuite (motor de simulación). requirements.txt trae robosuite;
 #    -e registra el paquete libero del repo.
 pip install -q -r benchmarks/libero/Libero-10-r/requirements.txt
 pip install -q -e benchmarks/libero/Libero-10-r
 
-# 2) Stack VLA (OpenVLA) — al final, para que sus versiones fijadas ganen.
+# 3) Stack VLA (OpenVLA) — al final, para que sus versiones fijadas ganen.
 pip install -q -r requirements-vla.txt
+
+# 4) Sanidad: reporta conflictos de dependencias declaradas (no aborta el job).
+pip check || echo "AVISO: pip check reporto conflictos (revisar arriba)."
 
 # Iniciar jupyter.
 PORT=2849

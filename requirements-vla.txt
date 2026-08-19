@@ -1,10 +1,19 @@
 # Dependencias de GPU para correr OpenVLA + LIBERO en el cluster.
 #
-# 1) torch (+ torchvision, que necesita timm) se instalan APARTE, segun la CUDA
-#    del cluster (1080Ti/2080Ti van bien con cu118). Ejemplo:
-#       pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
-#    IMPORTANTE: usa un torch compatible con NumPy 1.x (ver numpy<2 abajo). torch
-#    2.2.x es lo que prueba OpenVLA; con torch muy nuevo verifica que carga bien.
+# 1) torch (+ torchvision, que necesita timm) se instalan APARTE. La version
+#    depende de la ARQUITECTURA de la GPU del cluster:
+#      - GPU nueva (Blackwell, sm_100/sm_120, requiere CUDA 12.8+): torch >= 2.6
+#        con el build de CUDA correcto, p. ej.:
+#            pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130
+#      - GPU antigua (Pascal/Turing, 1080Ti/2080Ti): torch 2.2.0 + cu118 basta.
+#
+#    OJO con el checkpoint: desde torch 2.6 el default de torch.load es
+#    weights_only=True, que rompe la carga de checkpoints de LIBERO/OpenVLA
+#    ("UnpicklingError: Weights only load failed"). Si la GPU obliga a torch>=2.6,
+#    aplica el shim (fuente confiable) ANTES de cargar nada:
+#        import torch, functools
+#        torch.load = functools.partial(torch.load, weights_only=False)
+#    torch debe ser compatible con NumPy 1.x (ver numpy<2 abajo).
 #
 # 2) LIBERO (robosuite, bddl, ...) se instala desde el repo incluido:
 #       pip install -r benchmarks/libero/Libero-10-r/requirements.txt
