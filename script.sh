@@ -17,9 +17,14 @@ pwd; hostname; date
 source ~/miniforge3/etc/profile.d/conda.sh
 conda activate openvla
 
-# Instalar dependencias
-pip install -r requirements-vla.txt
-pip install -e benchmarks/libero/repo
+# Instalar dependencias (modo silencioso -q: no llena el log con "Requirement
+# already satisfied" cuando la dependencia ya está instalada; solo muestra
+# warnings y errores).
+pip install -q -r requirements-vla.txt
+# LIBERO + robosuite (motor de simulación). requirements.txt fija las versiones
+# compatibles (incluye robosuite); -e registra el paquete libero del repo.
+pip install -q -r benchmarks/libero/Libero-10-r/requirements.txt
+pip install -q -e benchmarks/libero/Libero-10-r
 
 # Iniciar jupyter.
 PORT=2849
