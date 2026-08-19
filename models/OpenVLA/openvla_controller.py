@@ -19,7 +19,7 @@ class OpenVLAController(Model):
     """Wrapper de OpenVLA que implementa la interfaz `Model`."""
 
     def __init__(self, model_id=DEFAULT_MODEL, unnorm_key=None, device="cuda",
-                 load_in_4bit=True, view=View.AGENT, center_crop=True):
+                 view=View.AGENT, center_crop=True):
         """
         Parametros
         ----------
@@ -30,8 +30,6 @@ class OpenVLAController(Model):
             sola, se usa esa automaticamente.
         device : str
             "cuda" (Colab/Kaggle) o "cpu".
-        load_in_4bit : bool
-            Carga cuantizada a 4-bit (NF4), para caber en GPUs chicas.
         view : View | str
             Que vista de la `Observation` usa este modelo.
         center_crop : bool
@@ -41,7 +39,7 @@ class OpenVLAController(Model):
         self.device = device
         self.view = view
         self.center_crop = center_crop
-        self._load(load_in_4bit)
+        self._load()
         self.unnorm_key = self._resolve_unnorm_key(unnorm_key)
 
     # ------------------------------------------------------------------ #
@@ -57,10 +55,9 @@ class OpenVLAController(Model):
     # ------------------------------------------------------------------ #
     #  Bajo nivel: carga y prediccion cruda
     # ------------------------------------------------------------------ #
-    def _load(self, load_in_4bit):
+    def _load(self):
         import torch
-        from transformers import (AutoModelForVision2Seq, AutoProcessor,
-                                   BitsAndBytesConfig)
+        from transformers import AutoModelForVision2Seq, AutoProcessor
         print("Empiezo load")
         self._torch = torch
         # La T4 (Turing) no tiene bf16 nativo -> computar en fp16.
@@ -69,28 +66,15 @@ class OpenVLAController(Model):
         self.processor = AutoProcessor.from_pretrained(
             self.model_id, trust_remote_code=True)
 
-        kwargs = dict(
-            attn_implementation="sdpa",   # no hay flash-attn en la T4
-            low_cpu_mem_usage=True,       # la RAM de Colab es justa al cargar 8B
+        self.model = AutoModelForVision2Seq.from_pretrained(
+            self.model_id,
+            attn_implementation="sdpa",
+            low_cpu_mem_usage=True,
             trust_remote_code=True,
+            torch_dtype=self.compute_dtype,
+            device_map="auto",          # <-- reparte capas entre GPUs
         )
-        if load_in_4bit:
-            print("Empiezo load en 4 bits")
-            # device_map="auto": coloca los pesos en la GPU MIENTRAS carga, en
-            # vez de materializar 16 GB en la RAM del sistema.
-            kwargs["device_map"] = "auto"
-            kwargs["quantization_config"] = BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_quant_type="nf4",
-                bnb_4bit_compute_dtype=self.compute_dtype,
-                bnb_4bit_use_double_quant=True,
-            )
-        else:
-            kwargs["torch_dtype"] = self.compute_dtype
 
-        self.model = AutoModelForVision2Seq.from_pretrained(self.model_id, **kwargs)
-        if not load_in_4bit:
-            self.model = self.model.to(self.device)
         self.model.eval()
 
     def predict_action(self, image, instruction):

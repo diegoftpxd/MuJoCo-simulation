@@ -33,7 +33,7 @@ def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     
     model = OpenVLAController(view=View.AGENT, center_crop=True,
-                             load_in_4bit=True, device="cuda")
+                             device="cuda")
     print("modelo cargado | unnorm_key =", model.unnorm_key)
 
     resultados = []
