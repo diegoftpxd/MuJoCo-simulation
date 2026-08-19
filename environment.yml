@@ -4,7 +4,8 @@ channels:
 dependencies:
   - python=3.12
   - numpy
-  - pillow
   - pip
   - pip:
       - mujoco>=3.11
+      - imageio
+      - imageio-ffmpeg

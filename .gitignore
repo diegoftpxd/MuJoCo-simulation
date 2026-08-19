@@ -19,6 +19,10 @@ output/*
 *.mp4
 *.gif
 
+# --- Fuentes externas vendorizadas (repos clonados, no versionar aqui) ---
+benchmarks/libero/repo/
+dataset/
+
 # --- Pesos de modelos / cache de HuggingFace (no versionar, son GB) ---
 hf_cache/
 *.safetensors

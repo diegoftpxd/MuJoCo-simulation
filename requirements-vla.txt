@@ -1,0 +1,25 @@
+# Dependencias de GPU para correr OpenVLA + LIBERO en el cluster.
+#
+# 1) torch se instala APARTE, segun la CUDA del cluster (1080Ti/2080Ti van bien
+#    con cu118). Ejemplo:
+#       pip install torch --index-url https://download.pytorch.org/whl/cu118
+#
+# 2) LIBERO (robosuite, bddl, ...) se instala desde el repo incluido:
+#       pip install -e benchmarks/libero/repo
+#
+# 3) Luego:  pip install -r requirements-vla.txt
+
+# --- Stack OpenVLA (versiones fijadas por el codigo remoto del modelo) ---
+transformers==4.40.1
+timm==0.9.10
+huggingface_hub==0.23.5
+tokenizers
+accelerate
+bitsandbytes
+hf_transfer
+
+# --- Simulacion + render headless (mismo que requirements.txt) ---
+mujoco>=3.11
+numpy
+imageio
+imageio-ffmpeg

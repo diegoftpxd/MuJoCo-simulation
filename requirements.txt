@@ -1,2 +1,12 @@
+# Dependencias de SIMULACION y framework (sin GPU).
+# Cubre: robots, objects, simulation, core, benchmarks/example, models/Random,
+# y los scripts run.py / simulate.py / record.py / demo_pick.py.
+#
+# Las dependencias pesadas de los modelos VLA (torch, transformers, bitsandbytes)
+# y de LIBERO (robosuite, libero) NO van aqui: se instalan aparte en la GPU
+# (Kaggle/cluster), porque este entorno solo necesita correr la simulacion.
+
 mujoco>=3.11
-pillow
+numpy
+imageio
+imageio-ffmpeg

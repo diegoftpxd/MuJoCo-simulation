@@ -8,8 +8,8 @@ y mantiene la interfaz común `BenchMark`.
 - En `step` toma el `cartesian_delta` + `gripper` de la `Action` y adapta la
   **convención de pinza de LIBERO** ([0,1] → {-1,+1} invertida).
 
-Encuentra el repo de LIBERO clonado bajo `benchmarks/` (sin importar cuantas
-carpetas de anidamiento tenga) y lo agrega al `sys.path`, así funciona sin
+El codigo fuente de LIBERO vive en `benchmarks/libero/repo/` (repo clonado).
+Este modulo agrega ese repo al `sys.path` para que `import libero` funcione sin
 `pip install`. Las deps pesadas (robosuite, mujoco) siguen siendo necesarias.
 """
 
@@ -24,7 +24,7 @@ import numpy as np
 from benchmarks.benchmark import BenchMark
 from core import Observation, StepResult, View
 
-_BENCHMARKS_DIR = os.path.dirname(os.path.abspath(__file__))
+_PKG_DIR = os.path.dirname(os.path.abspath(__file__))   # benchmarks/libero
 
 
 def _ensure_libero_importable():
@@ -35,12 +35,12 @@ def _ensure_libero_importable():
     except ImportError:
         pass
     # Busca el subpaquete anidado libero/libero para ubicar la raiz del repo.
-    hits = glob.glob(os.path.join(_BENCHMARKS_DIR, "**", "libero", "libero",
+    hits = glob.glob(os.path.join(_PKG_DIR, "**", "libero", "libero",
                                   "__init__.py"), recursive=True)
     if not hits:
         raise ImportError(
-            "No encontre el repo de LIBERO bajo benchmarks/. Clonalo ahi o "
-            "instala el paquete `libero`.")
+            "No encontre el repo de LIBERO en benchmarks/libero/repo/. "
+            "Clonalo ahi o instala el paquete `libero`.")
     # .../<repo>/libero/libero/__init__.py -> raiz del repo = 3 dirs arriba.
     repo_root = os.path.dirname(os.path.dirname(os.path.dirname(hits[0])))
     if repo_root not in sys.path:
@@ -67,12 +67,28 @@ class LiberoController(BenchMark):
                                       camera_widths=camera_size)
         self.env.seed(0)
         self._init_states = self._suite.get_task_init_states(task_id)
-        self._init_state = init_state
+        self._episode = init_state          # episodio (config inicial) actual
         self._num_settle = num_settle
 
     @property
     def instruction(self) -> str:
         return self._instruction
+
+    @property
+    def num_episodes(self) -> int:
+        """Configuraciones iniciales disponibles para esta tarea."""
+        return len(self._init_states)
+
+    @classmethod
+    def tasks(cls, suite="libero_10"):
+        """
+        Lista `[(task_id, instruccion)]` de una suite, SIN crear entornos.
+        Sirve para que el driver itere los escenarios (tareas).
+        """
+        _ensure_libero_importable()
+        from libero.libero import benchmark
+        ts = benchmark.get_benchmark_dict()[suite]()
+        return [(i, ts.get_task(i).language) for i in range(ts.n_tasks)]
 
     def _to_observation(self, raw) -> Observation:
         # robosuite entrega las imagenes giradas 180° -> las dejamos derechas.
@@ -88,11 +104,15 @@ class LiberoController(BenchMark):
         return Observation(images=images, state=state,
                            instruction=self._instruction)
 
-    def reset(self) -> Observation:
+    def reset(self, episode=None) -> Observation:
+        # Selecciona el episodio (config inicial). None -> avanza al siguiente.
+        n = len(self._init_states)
+        idx = self._episode if episode is None else episode
+        self._episode = (idx + 1) % n           # para el proximo reset()
         self.env.reset()
-        self.env.set_init_state(self._init_states[self._init_state])
+        self.env.set_init_state(self._init_states[idx % n])
         raw = None
-        for _ in range(self._num_settle):     # dejar asentar los objetos
+        for _ in range(self._num_settle):        # dejar asentar los objetos
             raw, _, _, _ = self.env.step([0, 0, 0, 0, 0, 0, -1])
         return self._to_observation(raw)
 

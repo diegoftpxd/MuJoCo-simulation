@@ -48,13 +48,14 @@ class VideoRecorder:
         return path
 
 
-def run_episode(benchmark, model, max_steps=300, recorder=None):
+def run_episode(benchmark, model, max_steps=300, recorder=None, episode=None):
     """
     Corre un episodio: `benchmark` y `model` solo se comunican via
     `Observation`/`Action`, por lo que se pueden intercambiar libremente.
+    `episode` elige la configuracion inicial del escenario (ver `BenchMark`).
     """
     model.reset()
-    observation = benchmark.reset()
+    observation = benchmark.reset(episode)
     total_reward, done, step = 0.0, False, 0
 
     for step in range(max_steps):

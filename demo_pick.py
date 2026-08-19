@@ -35,10 +35,6 @@ SEQUENCE = [
     Waypoint(5.5, PoseDelta(dy=-0.15)),
     Waypoint(6, PoseDelta(dz=-0.10)),
     Waypoint(7, PoseDelta(droll=1)),
-    #Waypoint(5.0, PoseDelta(dx=0.18)),                # trasladar de lado
-    #Waypoint(6.5, PoseDelta(dz=-0.10)),               # bajar
-    #Waypoint(8.0, gripper_open=True),                 # soltar
-    #Waypoint(9.0, PoseDelta(dz=0.10)),                # retirar
 ]
 
 

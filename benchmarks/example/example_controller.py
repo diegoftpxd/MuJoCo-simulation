@@ -46,7 +46,8 @@ class ExampleController(BenchMark):
         return Observation(images=images, state=state,
                            instruction=self._instruction)
 
-    def reset(self) -> Observation:
+    def reset(self, episode=None) -> Observation:
+        # Un solo escenario: `episode` no cambia nada aqui (es un ejemplo).
         self.sim.reset()
         self._steps = 0
         return self._observe()

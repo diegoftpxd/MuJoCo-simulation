@@ -11,6 +11,7 @@ benchmarks y modelos.
 
 from .action import Action
 from .episode import EpisodeResult, StepResult, VideoRecorder, run_episode
+from .experiment import run_experiments, summarize
 from .observation import Observation, View
 
 __all__ = [
@@ -21,4 +22,6 @@ __all__ = [
     "EpisodeResult",
     "run_episode",
     "VideoRecorder",
+    "run_experiments",
+    "summarize",
 ]
