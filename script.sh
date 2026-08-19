@@ -20,11 +20,19 @@ conda activate openvla
 # Instalar dependencias (modo silencioso -q: no llena el log con "Requirement
 # already satisfied" cuando la dependencia ya está instalada; solo muestra
 # warnings y errores).
-pip install -q -r requirements-vla.txt
-# LIBERO + robosuite (motor de simulación). requirements.txt fija las versiones
-# compatibles (incluye robosuite); -e registra el paquete libero del repo.
+#
+# ORDEN IMPORTANTE: LIBERO fija un transformers viejo, incompatible con el
+# codigo remoto de OpenVLA. Por eso se instala PRIMERO LIBERO y el stack VLA va
+# AL FINAL: asi los pines de requirements-vla.txt (transformers 4.40.1, etc.)
+# tienen la ultima palabra y no quedan degradados.
+
+# 1) LIBERO + robosuite (motor de simulación). requirements.txt trae robosuite;
+#    -e registra el paquete libero del repo.
 pip install -q -r benchmarks/libero/Libero-10-r/requirements.txt
 pip install -q -e benchmarks/libero/Libero-10-r
+
+# 2) Stack VLA (OpenVLA) — al final, para que sus versiones fijadas ganen.
+pip install -q -r requirements-vla.txt
 
 # Iniciar jupyter.
 PORT=2849

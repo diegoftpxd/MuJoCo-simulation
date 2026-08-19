@@ -5,15 +5,19 @@
 #       pip install torch --index-url https://download.pytorch.org/whl/cu118
 #
 # 2) LIBERO (robosuite, bddl, ...) se instala desde el repo incluido:
-#       pip install -e benchmarks/libero/repo
+#       pip install -r benchmarks/libero/Libero-10-r/requirements.txt
+#       pip install -e benchmarks/libero/Libero-10-r
 #
-# 3) Luego:  pip install -r requirements-vla.txt
+# 3) ESTE archivo se instala AL FINAL:  pip install -r requirements-vla.txt
+#    LIBERO fija un transformers viejo (incompatible con el codigo remoto de
+#    OpenVLA); instalar este archivo despues hace que sus pines tengan la ultima
+#    palabra. Por eso transformers/tokenizers/huggingface_hub van FIJADOS.
 
 # --- Stack OpenVLA (versiones fijadas por el codigo remoto del modelo) ---
 transformers==4.40.1
-timm==0.9.10
+tokenizers==0.19.1        # el rango que exige transformers 4.40.1
 huggingface_hub==0.23.5
-tokenizers
+timm==0.9.10
 accelerate
 hf_transfer
 
