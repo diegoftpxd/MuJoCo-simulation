@@ -4,7 +4,7 @@
 #SBATCH --mail-user=diego.toledo@uc.cl             # El mail del usuario
 #SBATCH --ntasks=1                     # Correr una sola tarea
 #SBATCH --cpus-per-task=1              # Número de CPUs (threads) para el notebook
-#SBATCH --mem=8gb                      # Memoria reservada para el trabajo
+#SBATCH --mem=16gb                      # Memoria reservada para el trabajo
 #SBATCH --partition=ialab              # Partición donde correr el trabajo
 ##SBATCH --nodelist=<node>              # Nodo donde correr el trabajo
 #SBATCH --output=slurm/logs/%x_%j.log  # Nombre del output (%x=nombre del trabajo, %j=ID del trabajo)
