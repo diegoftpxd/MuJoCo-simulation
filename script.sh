@@ -3,11 +3,11 @@
 #SBATCH --mail-type=END,FAIL           # Enviar eventos al mail (NONE, BEGIN, END, FAIL, ALL)
 #SBATCH --mail-user=diego.toledo@uc.cl             # El mail del usuario
 #SBATCH --ntasks=1                     # Correr una sola tarea
-#SBATCH --cpus-per-task=1              # Número de CPUs (threads) para el notebook
-#SBATCH --mem=16gb                      # Memoria reservada para el trabajo
+#SBATCH --cpus-per-task=5              # Número de CPUs (threads) para el notebook
+#SBATCH --mem=20gb                      # Memoria reservada para el trabajo
 #SBATCH --partition=ialab              # Partición donde correr el trabajo
-##SBATCH --nodelist=<node>              # Nodo donde correr el trabajo
-#SBATCH --output=slurm/logs/%x_%j.log  # Nombre del output (%x=nombre del trabajo, %j=ID del trabajo)
+#SBATCH --nodelist=hydra              # Nodo donde correr el trabajo
+#SBATCH --output=slurm/logs/%x.log  # Nombre del output (%x=nombre del trabajo, %j=ID del trabajo)
 #SBATCH --time=1:00:00                 # Tiempo limite del trabajo. Importante definirlo para no
                                        # mantener recursos ocupados si olvidas cerrar el servidor
 #SBATCH --gres=gpu:2                  # Solicitar una GPU de ser necesario (descomentar si se necesita)
