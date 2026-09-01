@@ -45,12 +45,13 @@ class OpenVLAController(Model):
     # ------------------------------------------------------------------ #
     #  Interfaz comun (Model)
     # ------------------------------------------------------------------ #
-    def act(self, observation) -> Action:
+    def act(self, observation) -> list:
         image = observation.image(self.view)          # el modelo ELIGE su vista
         if self.center_crop:
             image = self._center_crop(image)
         vec = self.predict_action(image, observation.instruction)
-        return Action.from_cartesian(vec[:6], gripper=float(vec[6]), raw=vec)
+        # OpenVLA predice una sola accion -> chunk de 1.
+        return [Action.from_cartesian(vec[:6], gripper=float(vec[6]), raw=vec)]
 
     # ------------------------------------------------------------------ #
     #  Bajo nivel: carga y prediccion cruda

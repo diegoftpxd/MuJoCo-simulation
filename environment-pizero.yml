@@ -1,0 +1,54 @@
+# Entorno conda para correr Pi-zero (pi0) + LIBERO.
+#
+# SEPARADO del entorno de OpenVLA a proposito: lerobot[pi] exige un transformers
+# moderno que choca de frente con el transformers==4.40.1 que necesita OpenVLA.
+# Cada modelo, su entorno. Los pesos (en HF_HOME) se comparten entre ambos.
+#
+# Crear:    conda env create -f environment-pizero.yml
+# Activar:  conda activate pizero
+#
+# ---------------------------------------------------------------------------
+# PASOS DESPUES DE CREAR EL ENTORNO (no van en el yaml):
+#
+# 1) torch + torchvision APARTE, segun la GPU del cluster (igual que con OpenVLA).
+#    GPU nueva (Blackwell, CUDA 12.8+):
+#        pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130
+#    Si la GPU obliga a torch>=2.6, su torch.load usa weights_only=True: aplica el
+#    shim (weights_only=False) ANTES de cargar checkpoints (ver la celda de setup
+#    del notebook).
+#
+# 2) LIBERO editable (el repo que ya tienes clonado):
+#        pip install -e benchmarks/libero/Libero-10-r
+#
+# 3) Descargar el checkpoint de pi0 para LIBERO (en el login node, con internet):
+#        export HF_HOME=<tu carpeta hf_cache>
+#        python -c "from huggingface_hub import snapshot_download; \
+#                   snapshot_download('lerobot/pi0_libero_finetuned')"
+#
+# OJO: lerobot es moderno y puede pedir versiones de numpy/mujoco distintas a las
+# de robosuite 1.4.1. Si `pip check` reporta conflictos, reconcilia igual que
+# hicimos con OpenVLA (robosuite 1.4.1 + mujoco 2.3.2 + numpy<2 es el ancla de
+# LIBERO). Congela con `pip freeze > requirements-pizero-lock.txt` cuando funcione.
+# ---------------------------------------------------------------------------
+
+name: pizero
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+      # --- Pi-zero (LeRobot con extras de pi0) ---
+      - "lerobot[pi] @ git+https://github.com/huggingface/lerobot.git"
+
+      # --- Benchmark LIBERO (motor robosuite) ---
+      # Mismas versiones conocidas-buenas que en el stack de OpenVLA.
+      - robosuite==1.4.1
+      - mujoco==2.3.2
+      - "numpy<2"
+      - imageio
+      - imageio-ffmpeg
+
+      # --- Analisis/visualizacion del notebook ---
+      - pandas==2.2.3
+      - matplotlib

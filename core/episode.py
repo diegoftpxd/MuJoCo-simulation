@@ -53,15 +53,24 @@ def run_episode(benchmark, model, max_steps=300, recorder=None, episode=None):
     Corre un episodio: `benchmark` y `model` solo se comunican via
     `Observation`/`Action`, por lo que se pueden intercambiar libremente.
     `episode` elige la configuracion inicial del escenario (ver `BenchMark`).
+
+    El modelo devuelve una LISTA de acciones (un "chunk"): el runner las ejecuta
+    una a una contra el benchmark y, cuando se agota el chunk, vuelve a pedir con
+    la observacion actual. Un modelo de accion unica devuelve una lista de 1.
+    `benchmark.step` sigue siendo atomico (una accion -> una observacion), asi
+    que el reward, el `done` y la grabacion siguen a nivel de accion individual.
     """
     model.reset()
     observation = benchmark.reset(episode)
     total_reward, done, step = 0.0, False, 0
+    actions = []          # buffer del chunk actual (acciones aun no ejecutadas)
 
     for step in range(max_steps):
         if recorder is not None:
             recorder.record(observation)
-        action = model.act(observation)
+        if not actions:                       # chunk agotado -> pedir mas al modelo
+            actions = list(model.act(observation))
+        action = actions.pop(0)
         result = benchmark.step(action)
         observation = result.observation
         total_reward += result.reward

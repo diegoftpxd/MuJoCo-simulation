@@ -22,7 +22,8 @@ class RandomController(Model):
     def reset(self):
         self.rng = np.random.default_rng(self.seed)
 
-    def act(self, observation) -> Action:
+    def act(self, observation) -> list:
         delta = self.rng.uniform(-1.0, 1.0, size=6) * self.scale
         delta[3:] *= 0.5   # rotaciones más suaves
-        return Action.from_cartesian(delta, gripper=1.0)
+        # Politica de accion unica -> chunk de 1.
+        return [Action.from_cartesian(delta, gripper=1.0)]
