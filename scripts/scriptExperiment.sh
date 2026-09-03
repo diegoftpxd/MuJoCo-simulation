@@ -54,8 +54,15 @@ if ! conda run -n "${MODEL_ENV}" python -c "${CHECK}" 2>/dev/null; then
 fi
 
 # --- 2) Arrancar el SERVIDOR del modelo en background, en su entorno -------- #
+#     REPARTO DE GPUs: el job pide 2 GPUs. El servidor del modelo usa la GPU 0
+#     en EXCLUSIVA (CUDA_VISIBLE_DEVICES=0); el render de LIBERO (MuJoCo/EGL) y
+#     cualquier torch del notebook van a la GPU 1 (ver paso 4). Sin esto, pi0
+#     (~6.6GB) y el render de LIBERO caen en la misma tarjeta y el primer
+#     forward pass revienta con "CUDA out of memory".
+#     expandable_segments reduce la fragmentacion del allocator de torch.
 SERVER_LOG="slurm/logs/server_${MODEL}_${SLURM_JOB_ID:-local}.log"
 echo "Levantando servidor '${MODEL}' en el puerto ${PORT_MODEL} (log: ${SERVER_LOG})..."
+CUDA_VISIBLE_DEVICES=0 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
 HF_HOME="$HF_HOME" conda run --no-capture-output -n "${MODEL_ENV}" \
     python -m models.serving.server --model "${MODEL}" \
         --host 127.0.0.1 --port "${PORT_MODEL}" --device cuda \
@@ -81,6 +88,11 @@ done
 # --- 4) Arrancar JUPYTER en el entorno del benchmark ----------------------- #
 #     En el notebook:  from models.serving import RemoteModel
 #                      model = RemoteModel(url="http://localhost:${PORT_MODEL}")
+#     El benchmark (render MuJoCo/EGL + cualquier torch) usa la GPU 1, para no
+#     competir con el servidor del modelo (GPU 0). MUJOCO_EGL_DEVICE_ID elige la
+#     tarjeta de render de MuJoCo; CUDA_VISIBLE_DEVICES aisla torch a esa GPU.
+export CUDA_VISIBLE_DEVICES=1
+export MUJOCO_EGL_DEVICE_ID=1
 conda activate "${BENCH_ENV}"
 which jupyter
 echo ""
