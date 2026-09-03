@@ -47,12 +47,27 @@ def _ensure_libero_importable():
         sys.path.insert(0, repo_root)
 
 
+def _shim_torch_load():
+    """LIBERO carga sus `init_states` con `torch.load` (ver
+    libero/benchmark/__init__.py). torch >= 2.6 usa `weights_only=True` por
+    defecto y falla al des-picklear los arrays numpy de esos archivos con:
+    `Weights only load failed ... numpy.core.multiarray._reconstruct`.
+    Restauramos `weights_only=False`: los init states son parte del dataset de
+    LIBERO (fuente confiable). Idempotente; se llama antes de tocar el suite."""
+    import functools
+    import torch
+    if not getattr(torch.load, "_libero_shimmed", False):
+        torch.load = functools.partial(torch.load, weights_only=False)
+        torch.load._libero_shimmed = True
+
+
 class LiberoController(BenchMark):
     """Una tarea de una suite de LIBERO (por defecto `libero_10`)."""
 
     def __init__(self, task_id=0, suite="libero_10",
                  init_state=0, num_settle=10, camera_size=256):
         _ensure_libero_importable()
+        _shim_torch_load()   # LIBERO usa torch.load para los init states (torch>=2.6)
         from libero.libero import benchmark, get_libero_path
         from libero.libero.envs import OffScreenRenderEnv
 
