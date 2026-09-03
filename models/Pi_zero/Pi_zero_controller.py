@@ -5,8 +5,16 @@ implementa la interfaz `Model` devolviendo un CHUNK de acciones.
 A diferencia de OpenVLA (que es un modelo de `transformers`), pi0 se carga con
 lerobot y vive en un ENTORNO SEPARADO (ver `requirements/environment-pizero.yml`): sus
 dependencias chocan con el stack de OpenVLA. pi0 predice un HORIZONTE de acciones
-(action chunking) mediante flow-matching, justo lo que la interfaz nueva espera:
-`act` devuelve la lista de acciones del chunk y el runner las ejecuta una a una.
+(action chunking) mediante flow-matching.
+
+FLUJO DE INFERENCIA (lerobot 0.4.0): la normalizacion de entradas, la
+des-normalizacion de salida y la TOKENIZACION del lenguaje ya NO viven en la
+politica, sino en un pipeline de processors (`make_pre_post_processors`). Por eso
+seguimos el ejemplo oficial: `preprocess(frame) -> select_action -> postprocess`.
+`select_action` mantiene su propia COLA de chunk dentro de la politica (solo
+re-ejecuta el modelo cada `n_action_steps`), asi que `act` devuelve UNA accion por
+llamada y el runner vuelve a pedir en el siguiente paso; no se recomputa el modelo
+en cada paso. `reset` limpia esa cola entre episodios.
 
 Checkpoint por defecto: 'lerobot/pi0_libero_finetuned' (~4B, fine-tuneado en
 LIBERO). Se carga con `PI0Policy.from_pretrained(...)`.
@@ -66,11 +74,15 @@ class PiZeroController(Model):
     #  Interfaz comun (Model)
     # ------------------------------------------------------------------ #
     def act(self, observation) -> list:
-        chunk = self.predict_action(observation)      # (H, 7)
-        # pi0 predice un horizonte -> devolvemos el chunk entero; el runner lo
-        # ejecuta accion por accion y vuelve a pedir al agotarlo.
-        return [Action.from_cartesian(a[:6], gripper=float(a[6]), raw=a)
-                for a in chunk]
+        # Camino oficial (examples/tutorial/pi0): preprocess -> select_action ->
+        # postprocess. Devolvemos UNA accion; `select_action` sirve de su cola
+        # interna y solo re-ejecuta el modelo cada n_action_steps.
+        frame = self._build_frame(observation)
+        batch = self._preprocess(frame)               # normaliza + tokeniza + device
+        action = self.policy.select_action(batch)     # (1, action_dim) normalizado
+        action = self._postprocess(action)            # des-normaliza y pasa a cpu
+        a = np.asarray(action.squeeze(0).float().cpu().numpy(), dtype=float)  # (7,)
+        return [Action.from_cartesian(a[:6], gripper=float(a[6]), raw=a)]
 
     def reset(self):
         # Limpia la cola de acciones interna de la politica entre episodios.
@@ -91,43 +103,41 @@ class PiZeroController(Model):
             torch.load = functools.partial(torch.load, weights_only=False)
             torch.load._pizero_shimmed = True
         from lerobot.policies.pi0 import PI0Policy
+        from lerobot.policies.factory import make_pre_post_processors
         print("Empiezo load (pi0)")
         self._torch = torch
         self.policy = (PI0Policy.from_pretrained(self.model_id)
                        .to(self.device).eval())
-
-    def predict_action(self, observation):
-        """
-        Devuelve el chunk de acciones (H, 7) YA des-normalizado:
-        cada fila [dx, dy, dz, droll, dpitch, dyaw, pinza].
-
-        `PI0Policy` normaliza las entradas y des-normaliza la salida internamente
-        con las stats guardadas en el checkpoint, asi que pasamos estado crudo e
-        imagenes en [0, 1].
-        """
-        torch = self._torch
-        batch = self._build_batch(observation)
-        with torch.no_grad():
-            # (B, H, action_dim); B=1 aqui.
-            chunk = self.policy.predict_action_chunk(batch)
-        return np.asarray(chunk.squeeze(0).float().cpu().numpy(), dtype=float)
+        # Pipeline de processors (lerobot 0.4.0): normaliza/tokeniza las entradas
+        # (preprocess) y des-normaliza la salida (postprocess). Carga las stats
+        # de normalizacion desde el propio checkpoint (self.model_id).
+        self._preprocess, self._postprocess = make_pre_post_processors(
+            self.policy.config, self.model_id,
+            preprocessor_overrides={"device_processor": {"device": str(self.device)}})
 
     # ------------------------------------------------------------------ #
-    #  Internos: armado del batch que espera lerobot
+    #  Internos: armado del frame CRUDO que consume el preprocess
     # ------------------------------------------------------------------ #
-    def _build_batch(self, observation):
+    def _build_frame(self, observation):
+        """
+        Frame crudo que consume el `preprocess` de pi0 (mismo formato que
+        `build_inference_frame` del ejemplo oficial): imagenes (1, 3, H, W) en
+        float [0, 1], estado (1, D) float, y `task` como STRING (no lista). El
+        `preprocess` se encarga de normalizar, tokenizar el lenguaje y mover a
+        device; `predict_action_chunk` espera todo eso ya hecho.
+        """
         torch = self._torch
-        batch = {
+        frame = {
             self.image_key: self._to_chw(observation.image(self.view)),
             self.state_key: torch.as_tensor(
                 self._state_vector(observation), dtype=torch.float32,
                 device=self.device).unsqueeze(0),
-            "task": [observation.instruction],   # instruccion en lenguaje natural
+            "task": observation.instruction,   # instruccion en lenguaje natural
         }
         # La vista de muñeca es opcional: solo si el benchmark la ofrece.
         if observation.has_image(self.wrist_view):
-            batch[self.wrist_key] = self._to_chw(observation.image(self.wrist_view))
-        return batch
+            frame[self.wrist_key] = self._to_chw(observation.image(self.wrist_view))
+        return frame
 
     def _to_chw(self, img):
         """(H, W, 3) uint8 -> tensor (1, 3, H, W) float en [0, 1]."""
