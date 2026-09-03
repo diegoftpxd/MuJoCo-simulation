@@ -81,7 +81,15 @@ class PiZeroController(Model):
     #  Bajo nivel: carga e inferencia
     # ------------------------------------------------------------------ #
     def _load(self):
+        import functools
         import torch
+        # Shim de torch.load: lerobot 0.4.0 trae torch >= 2.6, cuyo torch.load
+        # usa weights_only=True por defecto y rompe la carga del checkpoint
+        # (pickle con numpy). Restauramos el comportamiento anterior. Seguro
+        # aqui: el checkpoint es de fuente confiable. Debe ir ANTES de cargar.
+        if not getattr(torch.load, "_pizero_shimmed", False):
+            torch.load = functools.partial(torch.load, weights_only=False)
+            torch.load._pizero_shimmed = True
         from lerobot.policies.pi0 import PI0Policy
         print("Empiezo load (pi0)")
         self._torch = torch

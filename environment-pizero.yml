@@ -1,34 +1,36 @@
-# Entorno conda para correr Pi-zero (pi0) + LIBERO.
+# Entorno conda del SERVIDOR de pi0 (Opcion A: frontera de proceso).
 #
-# SEPARADO del entorno de OpenVLA a proposito: lerobot[pi] exige un transformers
-# moderno que choca de frente con el transformers==4.40.1 que necesita OpenVLA.
-# Cada modelo, su entorno. Los pesos (en HF_HOME) se comparten entre ambos.
+# Este entorno corre SOLO el modelo (lerobot/pi0) como servidor de inferencia
+# (models/Pi_zero/server.py). El benchmark LIBERO NO vive aqui: corre en el
+# entorno `openvla` (robosuite 1.4.1 + mujoco 2.3.2 + numpy<2) y consume el
+# servidor por HTTP con `PiZeroClient`.
+#
+# Por eso este entorno ya NO trae robosuite / mujoco / numpy<2: esos eran la
+# fuente del conflicto (lerobot exige numpy 2.x + torch 2.7 y robosuite 1.4.1
+# exige numpy<2). Al separar por proceso, cada stack usa sus propias versiones
+# sin verse. lerobot arrastra su propio torch 2.7 (cu12; soporta RTX 2080/Turing)
+# y su propio numpy 2.x: se dejan resolver solos.
 #
 # Crear:    conda env create -f environment-pizero.yml
 # Activar:  conda activate pizero
 #
 # ---------------------------------------------------------------------------
-# PASOS DESPUES DE CREAR EL ENTORNO (no van en el yaml):
+# PASOS DESPUES DE CREAR EL ENTORNO:
 #
-# 1) torch + torchvision APARTE, segun la GPU del cluster (igual que con OpenVLA).
-#    GPU nueva (Blackwell, CUDA 12.8+):
-#        pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130
-#    Si la GPU obliga a torch>=2.6, su torch.load usa weights_only=True: aplica el
-#    shim (weights_only=False) ANTES de cargar checkpoints (ver la celda de setup
-#    del notebook).
+# 1) (Opcional) Si tu GPU necesita un build de torch para una CUDA concreta,
+#    instalalo ANTES que lerobot para fijarlo, p. ej.:
+#        pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+#    Si no, lerobot instala un torch valido por si mismo.
 #
-# 2) LIBERO editable (el repo que ya tienes clonado):
-#        pip install -e benchmarks/libero/Libero-10-r
-#
-# 3) Descargar el checkpoint de pi0 para LIBERO (en el login node, con internet):
+# 2) Descargar el checkpoint de pi0 para LIBERO (en el login node, con internet):
 #        export HF_HOME=<tu carpeta hf_cache>
 #        python -c "from huggingface_hub import snapshot_download; \
 #                   snapshot_download('lerobot/pi0_libero_finetuned')"
 #
-# OJO: lerobot es moderno y puede pedir versiones de numpy/mujoco distintas a las
-# de robosuite 1.4.1. Si `pip check` reporta conflictos, reconcilia igual que
-# hicimos con OpenVLA (robosuite 1.4.1 + mujoco 2.3.2 + numpy<2 es el ancla de
-# LIBERO). Congela con `pip freeze > requirements-pizero-lock.txt` cuando funcione.
+# 3) Levantar el servidor (ver scriptPiZeroA.sh):
+#        python -m models.Pi_zero.server --port 9000 --device cuda
+#
+# Congela con `pip freeze > requirements-pizero-lock.txt` cuando funcione.
 # ---------------------------------------------------------------------------
 
 name: pizero
@@ -38,17 +40,5 @@ dependencies:
   - python=3.10
   - pip
   - pip:
-      # --- Pi-zero (LeRobot con extras de pi0) ---
+      # --- Pi-zero (LeRobot con extras de pi0). Trae torch/numpy propios. ---
       - "lerobot[pi]==0.4.0"
-
-      # --- Benchmark LIBERO (motor robosuite) ---
-      # Mismas versiones conocidas-buenas que en el stack de OpenVLA.
-      - robosuite==1.4.1
-      - mujoco==2.3.2
-      - "numpy<2"
-      - imageio
-      - imageio-ffmpeg
-
-      # --- Analisis/visualizacion del notebook ---
-      - pandas==2.2.3
-      - matplotlib
