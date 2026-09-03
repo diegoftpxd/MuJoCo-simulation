@@ -39,7 +39,7 @@ dependencies:
   - pip
   - pip:
       # --- Pi-zero (LeRobot con extras de pi0) ---
-      - "lerobot[pi] @ git+https://github.com/huggingface/lerobot.git"
+      - "lerobot[pi]==0.4.0"
 
       # --- Benchmark LIBERO (motor robosuite) ---
       # Mismas versiones conocidas-buenas que en el stack de OpenVLA.

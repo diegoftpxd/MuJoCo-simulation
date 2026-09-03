@@ -1,0 +1,44 @@
+#!/bin/bash
+
+#SBATCH --job-name=notebookPiZero            # Nombre del trabajo
+#SBATCH --mail-type=END,FAIL           # Enviar eventos al mail (NONE, BEGIN, END, FAIL, ALL)
+#SBATCH --mail-user=diego.toledo@uc.cl             # El mail del usuario
+#SBATCH --ntasks=1                     # Correr una sola tarea
+#SBATCH --cpus-per-task=10                     # Número de CPUs (threads) para el notebook
+#SBATCH --mem=25gb                      # Memoria reservada para el trabajo
+#SBATCH --partition=ialab-low-unlimit              # Partición donde correr el trabajo
+#SBATCH --output=slurm/logs/%x.log  # Nombre del output (%x=nombre del trabajo, %j=ID del trabajo)
+#SBATCH --time=1:00:00                 # Tiempo limite del trabajo.
+#SBATCH --qos=debug
+##SBATCH --gres=gpu:2           # 2 GPUs RTX 2080 Ti
+##SBATCH --nodelist=ventress              # Nodo donde correr el trabajo
+
+pwd; hostname; date
+
+# Activa tu entorno de conda
+source ~/miniforge3/etc/profile.d/conda.sh
+
+conda env remove -n pizero -y
+conda env create -f environment-pizero.yml
+conda activate pizero
+pip install ipykernel notebook
+python -m ipykernel install --user --name pizero --display-name "Python (pizero)"
+
+# 4) Sanidad: reporta conflictos de dependencias declaradas (no aborta el job).
+pip check || echo "AVISO: pip check reporto conflictos (revisar arriba)."
+
+# Iniciar jupyter.
+PORT=2849
+which jupyter
+echo "Iniciando servidor de notebooks"
+echo ""
+echo "Para conectarte, ejecuta en tu máquina local:"
+echo "--------------------------------------------------------------------------------"
+echo "  ssh -L localhost:8888:$(hostname):${PORT} kraken"
+echo "--------------------------------------------------------------------------------"
+echo "Luego abre http://localhost:8888 en tu navegador."
+echo "El token de acceso aparece más abajo en este mismo log."
+echo ""
+jupyter notebook --no-browser --ip="*" --port=${PORT}
+echo "Trabajo $SLURM_JOBID finalizado"
+date
