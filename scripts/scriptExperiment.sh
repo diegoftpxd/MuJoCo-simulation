@@ -5,11 +5,12 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=40gb
-#SBATCH --partition=ialab
+#SBATCH --partition=ialab-low-unlimit
 #SBATCH --gres=gpu:2
+#SBATCH --qos=debug
 #SBATCH --output=slurm/logs/%x.log
-#SBATCH --time=2:00:00
-
+#SBATCH --time=1:00:00
+#SBATCH --nodelist=ventress
 pwd; hostname; date
 set -euo pipefail
 
