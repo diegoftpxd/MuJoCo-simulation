@@ -58,9 +58,15 @@ MuJoCo-simulation/
 ├── libero_test.py            # Script: OpenVLA sobre tareas de LIBERO-10
 ├── openvla_experiments.ipynb # Notebook de experimentos con OpenVLA
 ├── run_openvla.slurm         # Job de SLURM para correr en clúster
-├── requirements.txt          # Dependencias base (mujoco, numpy, imageio, ...)
-├── requirements-vla.txt      # Dependencias extra para VLA (torch, transformers)
-└── environment.yml           # Entorno conda
+├── scripts/                  # Scripts de lanzamiento (SLURM)
+│   ├── script.sh             #   Construye el env de OpenVLA/LIBERO + jupyter
+│   ├── scriptExperiment.sh   #   Sirve UN modelo (pi0/openvla) + notebook del benchmark
+│   └── scriptLLM.sh          #   Búsqueda LLM
+└── requirements/             # Dependencias y entornos conda
+    ├── requirements.txt      #   Dependencias base (mujoco, numpy, imageio, ...)
+    ├── requirements-vla.txt  #   Dependencias extra para VLA (torch, transformers)
+    ├── environment.yml       #   Entorno conda de simulación
+    └── environment-pizero.yml#   Entorno conda del servidor pi0 (lerobot)
 ```
 
 ---
@@ -259,17 +265,17 @@ python run.py
 ## Instalación
 
 ```bash
-conda env create -f environment.yml
+conda env create -f requirements/environment.yml
 ```
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements/requirements.txt
 ```
 
 Para los modelos VLA (OpenVLA), además:
 
 ```bash
-pip install -r requirements-vla.txt
+pip install -r requirements/requirements-vla.txt
 ```
 
 LIBERO requiere clonar su repo en `benchmarks/libero/repo/` (o instalar el

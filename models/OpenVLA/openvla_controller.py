@@ -57,7 +57,15 @@ class OpenVLAController(Model):
     #  Bajo nivel: carga y prediccion cruda
     # ------------------------------------------------------------------ #
     def _load(self):
+        import functools
         import torch
+        # Shim de torch.load: con torch >= 2.6 el default es weights_only=True,
+        # que rompe la carga de los checkpoints de OpenVLA/LIBERO (pickles con
+        # numpy). Restauramos el comportamiento anterior. Seguro aqui: los
+        # checkpoints son de fuente confiable. Debe ir ANTES de cargar el modelo.
+        if not getattr(torch.load, "_shimmed", False):
+            torch.load = functools.partial(torch.load, weights_only=False)
+            torch.load._shimmed = True
         from transformers import AutoModelForVision2Seq, AutoProcessor
         print("Empiezo load")
         self._torch = torch

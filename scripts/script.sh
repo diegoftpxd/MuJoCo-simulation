@@ -37,7 +37,7 @@ pip install -q -r benchmarks/libero/Libero-10-r/requirements.txt
 pip install -q -e benchmarks/libero/Libero-10-r
 
 # 3) Stack VLA (OpenVLA) — al final, para que sus versiones fijadas ganen.
-pip install -q -r requirements-vla.txt
+pip install -q -r requirements/requirements-vla.txt
 
 # 4) Sanidad: reporta conflictos de dependencias declaradas (no aborta el job).
 pip check || echo "AVISO: pip check reporto conflictos (revisar arriba)."

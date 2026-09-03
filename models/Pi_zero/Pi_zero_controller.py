@@ -3,7 +3,7 @@ Controlador de Pi-zero (pi0): wrapper de la politica `PI0Policy` de LeRobot que
 implementa la interfaz `Model` devolviendo un CHUNK de acciones.
 
 A diferencia de OpenVLA (que es un modelo de `transformers`), pi0 se carga con
-lerobot y vive en un ENTORNO SEPARADO (ver `environment-pizero.yml`): sus
+lerobot y vive en un ENTORNO SEPARADO (ver `requirements/environment-pizero.yml`): sus
 dependencias chocan con el stack de OpenVLA. pi0 predice un HORIZONTE de acciones
 (action chunking) mediante flow-matching, justo lo que la interfaz nueva espera:
 `act` devuelve la lista de acciones del chunk y el runner las ejecuta una a una.

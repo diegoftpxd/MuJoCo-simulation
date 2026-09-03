@@ -11,7 +11,7 @@
 # sin verse. lerobot arrastra su propio torch 2.7 (cu12; soporta RTX 2080/Turing)
 # y su propio numpy 2.x: se dejan resolver solos.
 #
-# Crear:    conda env create -f environment-pizero.yml
+# Crear:    conda env create -f requirements/environment-pizero.yml
 # Activar:  conda activate pizero
 #
 # ---------------------------------------------------------------------------
@@ -27,8 +27,8 @@
 #        python -c "from huggingface_hub import snapshot_download; \
 #                   snapshot_download('lerobot/pi0_libero_finetuned')"
 #
-# 3) Levantar el servidor (ver scriptPiZeroA.sh):
-#        python -m models.Pi_zero.server --port 9000 --device cuda
+# 3) Levantar el servidor (ver scripts/scriptExperiment.sh):
+#        python -m models.serving.server --model pi0 --port 9000 --device cuda
 #
 # Congela con `pip freeze > requirements-pizero-lock.txt` cuando funcione.
 # ---------------------------------------------------------------------------
