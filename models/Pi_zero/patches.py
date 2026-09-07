@@ -67,11 +67,14 @@ def _denoise_csv_path() -> str:
     return os.environ.get("PI0_DENOISE_CSV", "output/pi0_denoise/denoise_log.csv")
 
 
-def _log_denoise(call_idx, iteration, t_value, num_steps, x_t):
+def _log_denoise(step, call_idx, iteration, t_value, num_steps, x_t):
     """
     Agrega al CSV una fila por muestra del batch con el vector `x_t` aplanado y
     los metadatos del paso. La primera escritura de cada proceso TRUNCA el archivo
     (empieza limpio) y escribe la cabecera.
+
+    `step` = paso del entorno (lo fija el cliente con model.set_context(step=...);
+    -1 si no se seteo). Permite agrupar corridas por estado del entorno.
     """
     path = _denoise_csv_path()
     if not path:                                  # PI0_DENOISE_CSV="" -> sin log
@@ -92,12 +95,12 @@ def _log_denoise(call_idx, iteration, t_value, num_steps, x_t):
     with p.open(mode, newline="") as f:
         w = csv.writer(f)
         if write_header:
-            cols = ["call", "batch", "iteration", "time", "num_steps"]
+            cols = ["step", "call", "batch", "iteration", "time", "num_steps"]
             cols += [f"v{i}" for i in range(flat.shape[1])]
             w.writerow(cols)
         for b in range(flat.shape[0]):
-            w.writerow([call_idx, b, iteration, float(t_value), int(num_steps),
-                        *flat[b].tolist()])
+            w.writerow([int(step), call_idx, b, iteration, float(t_value),
+                        int(num_steps), *flat[b].tolist()])
 
 
 # --------------------------------------------------------------------------- #
@@ -142,7 +145,8 @@ def sample_actions(self, images, img_masks, lang_tokens, lang_masks, state,
 
     x_t = noise
     call_idx = _next_call_index()
-    _log_denoise(call_idx, 0, 1.0, num_steps, x_t)     # iteracion 0 = ruido inicial
+    step = int(getattr(self, "_pi0_step", -1))         # paso del entorno (set_context)
+    _log_denoise(step, call_idx, 0, 1.0, num_steps, x_t)   # iteracion 0 = ruido inicial
 
     time = torch.tensor(1.0, dtype=torch.float32, device=device)
     iteration = 0
@@ -154,7 +158,7 @@ def sample_actions(self, images, img_masks, lang_tokens, lang_masks, state,
         time += dt
         iteration += 1
         # Registra el x_t predicho tras este paso (tiempo t ya actualizado).
-        _log_denoise(call_idx, iteration, float(time), num_steps, x_t)
+        _log_denoise(step, call_idx, iteration, float(time), num_steps, x_t)
 
     return x_t
 

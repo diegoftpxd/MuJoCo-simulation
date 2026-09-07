@@ -88,6 +88,17 @@ class PiZeroController(Model):
         if getattr(self, "policy", None) is not None and hasattr(self.policy, "reset"):
             self.policy.reset()
 
+    def set_context(self, step=None, **kwargs):
+        """
+        Metadatos para el logging del denoising (ver models/Pi_zero/patches.py).
+        El cliente los envia con `RemoteModel.set_context(...)`. Hoy soporta `step`
+        (el paso del entorno), que se guarda en el modelo interno para que
+        `sample_actions` lo escriba en la columna `step` del CSV.
+        """
+        model = getattr(getattr(self, "policy", None), "model", None)
+        if model is not None and step is not None:
+            model._pi0_step = int(step)
+
     # ------------------------------------------------------------------ #
     #  Bajo nivel: carga e inferencia
     # ------------------------------------------------------------------ #

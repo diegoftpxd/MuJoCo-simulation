@@ -16,6 +16,7 @@ Uso en el notebook del benchmark:
     # ...luego identico: run_experiments(model, benchmarks, ...)
 """
 
+import json
 import urllib.request
 
 from models.Model import Model
@@ -56,3 +57,14 @@ class RemoteModel(Model):
     def act(self, observation) -> list:
         blob = wire.dump_observation(observation)
         return wire.load_actions(self._post("/act", blob))
+
+    def set_context(self, **kwargs):
+        """
+        Envia metadatos al modelo remoto (p. ej. `step=` el paso del entorno) para
+        que los adjunte a su logging. No es critico: si el servidor o el modelo no
+        lo soportan, se ignora en silencio.
+        """
+        try:
+            self._post("/context", json.dumps(kwargs).encode("utf-8"))
+        except Exception:                           # noqa: BLE001
+            pass

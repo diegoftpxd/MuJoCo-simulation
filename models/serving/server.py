@@ -22,6 +22,7 @@ Endpoints:
 """
 
 import argparse
+import json
 import threading
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -106,6 +107,17 @@ class _Handler(BaseHTTPRequestHandler):
                 with self.lock:
                     actions = self.model.act(obs)       # List[Action]
                 self._send(200, wire.dump_actions(actions))
+                return
+            if self.path == "/context":
+                # Metadatos opcionales para el modelo (p. ej. step del entorno para
+                # el logging). Generico: solo aplica si el modelo tiene set_context.
+                body = self._read_body()
+                ctx = json.loads(body.decode("utf-8")) if body else {}
+                setter = getattr(self.model, "set_context", None)
+                if callable(setter):
+                    with self.lock:
+                        setter(**ctx)
+                self._send(200, "ok", "text/plain")
                 return
             self._send(404, "not found", "text/plain")
         except Exception as exc:                        # noqa: BLE001
