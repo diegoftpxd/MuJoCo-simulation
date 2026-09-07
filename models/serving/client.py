@@ -25,15 +25,17 @@ from models.serving import wire
 class RemoteModel(Model):
     """Proxy HTTP de un modelo servido. Misma interfaz que cualquier `Model`."""
 
-    def __init__(self, url="http://localhost:9000", timeout=120.0):
+    def __init__(self, url="http://localhost:9000", timeout=600.0):
         """
         Parametros
         ----------
         url : str
             Base del servidor de inferencia (host:puerto donde corre server.py).
         timeout : float
-            Segundos maximos por request. La primera inferencia puede tardar;
-            subelo si ves timeouts.
+            Segundos maximos por request. La PRIMERA inferencia puede tardar
+            mucho (compilacion/autotune y, en GPUs sin bf16 nativo como Turing,
+            pi0 corre emulado y lento). Por eso el default es alto; subelo mas si
+            aun ves timeouts en el primer paso.
         """
         self.url = url.rstrip("/")
         self.timeout = timeout
