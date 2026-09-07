@@ -5,8 +5,10 @@ y mantiene la interfaz común `BenchMark`.
 - En la `Observation` entrega la vista `agentview` **ya orientada** (robosuite la
   renderiza girada 180°): así el modelo recibe la imagen derecha sin saber de
   ese detalle.
-- En `step` toma el `cartesian_delta` + `gripper` de la `Action` y adapta la
-  **convención de pinza de LIBERO** ([0,1] → {-1,+1} invertida).
+- En `step` toma el `cartesian_delta` + `gripper` de la `Action` y los pasa TAL
+  CUAL al entorno: `gripper` debe venir ya en la convención nativa de LIBERO. La
+  adaptación de convención (si el modelo usa otra, p. ej. OpenVLA en [0,1]) la
+  hace el CONTROLADOR del modelo, no el benchmark.
 
 El codigo fuente de LIBERO vive en `benchmarks/libero/repo/` (repo clonado).
 Este modulo agrega ese repo al `sys.path` para que `import libero` funcione sin
@@ -133,24 +135,20 @@ class LiberoController(BenchMark):
         return self._to_observation(raw)
 
     def step(self, action) -> StepResult:
-        # El benchmark decide QUE usa de la Action: delta cartesiano + pinza.
+        # El benchmark toma delta cartesiano + pinza y los pasa TAL CUAL a LIBERO.
+        # `action.gripper` debe venir ya en la convencion nativa de LIBERO (accion
+        # continua; el signo decide abrir/cerrar). Cada modelo entrega la pinza en
+        # esa convencion: pi0 la produce nativa y el controlador de OpenVLA hace su
+        # propia conversion desde [0,1] (ver OpenVLAController._to_libero_gripper).
+        # El benchmark NO reinterpreta la pinza -> asi sirve a cualquier modelo sin
+        # sesgarlo hacia la convencion de uno en particular.
         vec = np.zeros(7)
         if action.cartesian_delta is not None:
             vec[:6] = np.asarray(action.cartesian_delta, dtype=float)[:6]
         vec[6] = 0.0 if action.gripper is None else float(action.gripper)
-        vec = self._libero_gripper(vec)
         raw, reward, done, info = self.env.step(vec.tolist())
         return StepResult(observation=self._to_observation(raw),
                           reward=float(reward), done=bool(done), info=info)
-
-    @staticmethod
-    def _libero_gripper(vec):
-        """Pinza: [0,1] -> {-1,+1} binarizada e invertida (convención LIBERO)."""
-        vec = vec.copy()
-        vec[6] = 2.0 * vec[6] - 1.0
-        vec[6] = np.sign(vec[6])
-        vec[6] = -vec[6]
-        return vec
 
     def close(self):
         try:

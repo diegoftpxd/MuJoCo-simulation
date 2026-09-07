@@ -50,8 +50,22 @@ class OpenVLAController(Model):
         if self.center_crop:
             image = self._center_crop(image)
         vec = self.predict_action(image, observation.instruction)
+        # OpenVLA emite la pinza en [0,1]; LIBERO espera la accion nativa (continua,
+        # el signo decide abrir/cerrar). Convertimos AQUI, en el servidor de OpenVLA,
+        # para que el benchmark pase la pinza tal cual y no tenga que conocer esta
+        # convencion (antes este remap vivia en LiberoController).
+        gripper = self._to_libero_gripper(vec[6])
         # OpenVLA predice una sola accion -> chunk de 1.
-        return [Action.from_cartesian(vec[:6], gripper=float(vec[6]), raw=vec)]
+        return [Action.from_cartesian(vec[:6], gripper=gripper, raw=vec)]
+
+    @staticmethod
+    def _to_libero_gripper(g):
+        """Pinza OpenVLA [0,1] -> convencion nativa de LIBERO {-1,+1} (binarizada e
+        invertida). Se movio desde LiberoController para que el benchmark pase la
+        pinza tal cual y pi0 (que ya sale nativo) funcione sin este remap."""
+        g = 2.0 * float(g) - 1.0      # [0,1] -> [-1,1]
+        g = np.sign(g)                 # binariza a {-1,+1}
+        return float(-g)               # invierte (convencion LIBERO)
 
     # ------------------------------------------------------------------ #
     #  Bajo nivel: carga y prediccion cruda

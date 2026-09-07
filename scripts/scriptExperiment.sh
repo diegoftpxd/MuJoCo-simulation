@@ -60,7 +60,7 @@ fi
 #     (~6.6GB) y el render de LIBERO caen en la misma tarjeta y el primer
 #     forward pass revienta con "CUDA out of memory".
 #     expandable_segments reduce la fragmentacion del allocator de torch.
-SERVER_LOG="slurm/logs/server_${MODEL}_${SLURM_JOB_ID:-local}.log"
+SERVER_LOG="slurm/logs/server_${MODEL}.log"
 echo "Levantando servidor '${MODEL}' en el puerto ${PORT_MODEL} (log: ${SERVER_LOG})..."
 # TORCHDYNAMO_DISABLE=1: el pi0 de lerobot usa torch.compile, que en GPUs Turing
 # (RTX 2080, sin bf16 nativo / pocos SMs) falla al compilar/cudagraphs y ademas
