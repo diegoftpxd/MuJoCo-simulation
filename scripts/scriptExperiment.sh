@@ -62,7 +62,11 @@ fi
 #     expandable_segments reduce la fragmentacion del allocator de torch.
 SERVER_LOG="slurm/logs/server_${MODEL}_${SLURM_JOB_ID:-local}.log"
 echo "Levantando servidor '${MODEL}' en el puerto ${PORT_MODEL} (log: ${SERVER_LOG})..."
+# TORCHDYNAMO_DISABLE=1: el pi0 de lerobot usa torch.compile, que en GPUs Turing
+# (RTX 2080, sin bf16 nativo / pocos SMs) falla al compilar/cudagraphs y ademas
+# dispara una primera inferencia carisima. Forzamos modo eager: mas robusto aqui.
 CUDA_VISIBLE_DEVICES=0 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
+TORCHDYNAMO_DISABLE=1 \
 HF_HOME="$HF_HOME" conda run --no-capture-output -n "${MODEL_ENV}" \
     python -m models.serving.server --model "${MODEL}" \
         --host 127.0.0.1 --port "${PORT_MODEL}" --device cuda \

@@ -93,6 +93,11 @@ class PiZeroController(Model):
     #  Bajo nivel: carga e inferencia
     # ------------------------------------------------------------------ #
     def _load(self):
+        import os
+        # pi0 usa torch.compile; en GPUs Turing (RTX 2080) la compilacion/cudagraphs
+        # falla. Forzamos eager salvo que el usuario lo pida explicito. Debe ir
+        # ANTES de importar torch/lerobot. `setdefault` respeta el valor del script.
+        os.environ.setdefault("TORCHDYNAMO_DISABLE", "1")
         import functools
         import torch
         # Shim de torch.load: lerobot 0.4.0 trae torch >= 2.6, cuyo torch.load
