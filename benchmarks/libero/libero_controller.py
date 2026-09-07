@@ -114,6 +114,7 @@ class LiberoController(BenchMark):
             images[View.WRIST.value] = np.ascontiguousarray(wrist[::-1, ::-1])
         state = {
             "eef_pos": raw.get("robot0_eef_pos"),
+            "eef_quat": raw.get("robot0_eef_quat"),      # cuaternion (x,y,z,w)
             "gripper_qpos": raw.get("robot0_gripper_qpos"),
         }
         return Observation(images=images, state=state,

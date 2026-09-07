@@ -15,7 +15,6 @@
 pwd; hostname; date
 
 # Activa tu entorno de conda
-source ~/miniforge3/etc/profile.d/conda.sh
 conda activate openvla
 
 # Instalar dependencias (modo silencioso -q: no llena el log con "Requirement

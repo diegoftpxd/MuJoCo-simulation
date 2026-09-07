@@ -23,9 +23,9 @@ IMPORTANTE — cosas que dependen del checkpoint y hay que VERIFICAR contra su
 config (`policy.config.input_features` / `output_features`):
   - Los nombres de las claves de imagen/estado del batch (parametrizados abajo).
   - El vector de estado que espera: el checkpoint de LIBERO usa un estado de
-    ~8 dims. `LiberoController` hoy solo expone `eef_pos` (3) y `gripper_qpos`;
-    puede que tengas que ampliarlo para exponer la orientacion del efector y
-    armar el estado completo. Ajusta `_state_vector` en consecuencia.
+    8 dims = [eef_pos(3), orientacion axis-angle(3), gripper_qpos(2)] (convencion
+    openpi). Se arma en `_state_vector`; `LiberoController` expone `eef_pos`,
+    `eef_quat` y `gripper_qpos`, y la orientacion se pasa a axis-angle aqui.
   - pi0-LIBERO produce acciones de 7 dims [dx,dy,dz,droll,dpitch,dyaw, pinza],
     que ya es la convencion que `LiberoController.step` entiende.
 """
@@ -147,24 +147,38 @@ class PiZeroController(Model):
 
     def _state_vector(self, observation):
         """
-        Arma el vector de estado (propriocepcion) que espera el checkpoint.
+        Estado propioceptivo de 8 dims que espera pi0-LIBERO (convencion openpi):
+            [ eef_pos (3), orientacion en axis-angle (3), gripper_qpos (2) ]
 
-        OJO: DEBE coincidir en dimension y orden con el estado con que se entreno
-        pi0-LIBERO (~8 dims). Lo que `LiberoController` expone hoy (`eef_pos` +
-        `gripper_qpos`) puede NO ser suficiente; si el checkpoint espera tambien
-        la orientacion del efector, amplia `LiberoController._to_observation`
-        para incluirla y ajusta este armado.
+        La orientacion llega como cuaternion (x, y, z, w) de robosuite y se
+        convierte a axis-angle AQUI (sin depender de robosuite: este controller
+        corre en el entorno del modelo). El orden y la dimension DEBEN coincidir
+        con las stats del checkpoint; si no, el normalizador falla con un
+        mismatch de tamano (p. ej. "tensor a (5) must match tensor b (8)").
         """
-        parts = []
         eef_pos = observation.get_state("eef_pos")
-        if eef_pos is not None:
-            parts.append(np.asarray(eef_pos, dtype=float).reshape(-1))
+        eef_quat = observation.get_state("eef_quat")
         gripper = observation.get_state("gripper_qpos")
-        if gripper is not None:
-            parts.append(np.asarray(gripper, dtype=float).reshape(-1))
-        if not parts:
+        if eef_pos is None or eef_quat is None or gripper is None:
             raise ValueError(
-                "La observacion no trae estado propioceptivo para pi0. "
-                "Revisa que el benchmark exponga 'eef_pos'/'gripper_qpos' y que "
-                "el estado coincida con lo que espera el checkpoint.")
-        return np.concatenate(parts)
+                "pi0-LIBERO espera estado de 8 dims [eef_pos(3), axis_angle(3), "
+                "gripper_qpos(2)]. Falta 'eef_pos', 'eef_quat' o 'gripper_qpos' en "
+                "la observacion; revisa LiberoController._to_observation.")
+        return np.concatenate([
+            np.asarray(eef_pos, dtype=float).reshape(-1),
+            self._quat2axisangle(np.asarray(eef_quat, dtype=float).reshape(-1)),
+            np.asarray(gripper, dtype=float).reshape(-1),
+        ])
+
+    @staticmethod
+    def _quat2axisangle(quat):
+        """
+        Cuaternion (x, y, z, w) -> axis-angle (3): vector unitario del eje escalado
+        por el angulo en radianes. Misma formula que `robosuite.utils.transform_utils
+        .quat2axisangle`, reimplementada en numpy para no depender de robosuite.
+        """
+        w = float(np.clip(quat[3], -1.0, 1.0))
+        den = np.sqrt(1.0 - w * w)
+        if den < 1e-8:                      # rotacion ~0 -> vector nulo
+            return np.zeros(3)
+        return (quat[:3] * 2.0 * np.arccos(w)) / den
