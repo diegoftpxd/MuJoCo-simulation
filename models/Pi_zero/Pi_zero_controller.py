@@ -31,7 +31,6 @@ config (`policy.config.input_features` / `output_features`):
 """
 
 import numpy as np
-
 from core import Action, View
 from models.Model import Model
 
@@ -113,6 +112,10 @@ class PiZeroController(Model):
         self._torch = torch
         self.policy = (PI0Policy.from_pretrained(self.model_id)
                        .to(self.device).eval())
+        # Monkeypatches propios del modelo (flow-matching, etc.). Editables en
+        # models/Pi_zero/patches.py; se desactivan con PI0_PATCH=0.
+        from models.Pi_zero.patches import apply_patches
+        apply_patches(self.policy)
         # Pipeline de processors (lerobot 0.4.0): normaliza/tokeniza las entradas
         # (preprocess) y des-normaliza la salida (postprocess). Carga las stats
         # de normalizacion desde el propio checkpoint (self.model_id).
@@ -187,3 +190,11 @@ class PiZeroController(Model):
         if den < 1e-8:                      # rotacion ~0 -> vector nulo
             return np.zeros(3)
         return (quat[:3] * 2.0 * np.arccos(w)) / den
+
+
+
+
+
+
+
+
