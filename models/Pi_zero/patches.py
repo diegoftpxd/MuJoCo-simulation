@@ -55,7 +55,7 @@ from lerobot.policies.pi0.modeling_pi0 import make_att_2d_masks
 #  Logging del denoising a CSV
 # --------------------------------------------------------------------------- #
 _CALL_COUNT = {"n": 0}      # nº de llamados a sample_actions en este proceso
-_FRESH = {"init": False}    # para truncar el CSV una vez por arranque del server
+_FRESH = set()              # rutas de CSV ya truncadas en este proceso
 
 
 def _next_call_index() -> int:
@@ -68,85 +68,16 @@ def _denoise_csv_path() -> str:
     return os.environ.get("PI0_DENOISE_CSV", "output/pi0_denoise/denoise_log.csv")
 
 
-# --------------------------------------------------------------------------- #
-#  Escala del ruido inicial del flow-matching
-# --------------------------------------------------------------------------- #
-_NOISE_SCALE = {"loaded": False, "arr": None}
-
-
-def _load_noise_scale(actions_shape, device):
+def _log_denoise(path, step, call_idx, iteration, t_value, num_steps, x_t):
     """
-    Escala por dimension para el ruido inicial. Si la variable de entorno
-    PI0_NOISE_SCALE apunta a un .npy (vector de `chunk_size*max_action_dim`,
-    p. ej. generado con scripts/make_noise_scale.py), el ruido N(0,1) se
-    MULTIPLICA por esa escala -> cada dimension cubre un area comparable a la
-    magnitud de los datos, mucho mayor que el N(0,1) estandar. Sin la variable,
-    devuelve None (ruido N(0,1) normal).
-    """
-    if not _NOISE_SCALE["loaded"]:
-        _NOISE_SCALE["loaded"] = True
-        path = os.environ.get("PI0_NOISE_SCALE", "")
-        if path:
-            vec = np.load(path).astype("float32").reshape(-1)
-            _NOISE_SCALE["arr"] = vec
-            print(f"[pi0] ruido ESCALADO: escala cargada de {path} "
-                  f"(dim {vec.size}, media {float(vec.mean()):.4g})", flush=True)
-    vec = _NOISE_SCALE["arr"]
-    if vec is None:
-        return None
-    expected = int(actions_shape[1]) * int(actions_shape[2])
-    if vec.size != expected:
-        raise ValueError(
-            f"PI0_NOISE_SCALE tiene dim {vec.size} != esperado {expected} "
-            f"(chunk_size*max_action_dim). Regenera con scripts/make_noise_scale.py.")
-    return torch.as_tensor(vec, device=device).reshape(
-        1, int(actions_shape[1]), int(actions_shape[2]))
-
-
-# --------------------------------------------------------------------------- #
-#  Ruido inicial AMPLIADO (opcional)
-#  Por defecto pi0 arranca el flow-matching con ruido N(0,1). Si defines
-#  PI0_NOISE_STD=<archivo .npy> con la std por dimension de las acciones finales,
-#  el ruido se escala por esa std (mismo espacio normalizado que x_t), cubriendo
-#  un area mucho mayor. PI0_NOISE_SCALE (default 1.0) permite amplificar mas.
-# --------------------------------------------------------------------------- #
-_NOISE_STD = {"loaded": False, "arr": None}
-
-
-def _noise_std_tensor(model, device):
-    if not _NOISE_STD["loaded"]:
-        _NOISE_STD["loaded"] = True
-        path = os.environ.get("PI0_NOISE_STD", "").strip()
-        if path and os.path.exists(path):
-            vec = np.load(path).astype("float32").reshape(-1)
-            cs, ad = int(model.config.chunk_size), int(model.config.max_action_dim)
-            if vec.size != cs * ad:
-                print(f"[pi0] PI0_NOISE_STD tiene {vec.size} dims != {cs * ad}; "
-                      "uso ruido estandar.", flush=True)
-            else:
-                scale = float(os.environ.get("PI0_NOISE_SCALE", "1.0"))
-                _NOISE_STD["arr"] = (torch.tensor(vec.reshape(cs, ad),
-                                                  dtype=torch.float32, device=device)
-                                     * scale)
-                print(f"[pi0] ruido AMPLIADO: std por dim de {path} (x{scale})",
-                      flush=True)
-        elif path:
-            print(f"[pi0] PI0_NOISE_STD='{path}' no existe; uso ruido estandar.",
-                  flush=True)
-    return _NOISE_STD["arr"]
-
-
-def _log_denoise(step, call_idx, iteration, t_value, num_steps, x_t):
-    """
-    Agrega al CSV una fila por muestra del batch con el vector `x_t` aplanado y
-    los metadatos del paso. La primera escritura de cada proceso TRUNCA el archivo
-    (empieza limpio) y escribe la cabecera.
+    Agrega al CSV `path` una fila por muestra del batch con el vector `x_t`
+    aplanado y los metadatos del paso. La PRIMERA escritura a cada ruta en este
+    proceso la TRUNCA (empieza limpia) y escribe la cabecera; luego anexa.
 
     `step` = paso del entorno (lo fija el cliente con model.set_context(step=...);
     -1 si no se seteo). Permite agrupar corridas por estado del entorno.
     """
-    path = _denoise_csv_path()
-    if not path:                                  # PI0_DENOISE_CSV="" -> sin log
+    if not path:                                  # ruta vacia -> sin log
         return
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -154,12 +85,12 @@ def _log_denoise(step, call_idx, iteration, t_value, num_steps, x_t):
     arr = x_t.detach().to(torch.float32).cpu().numpy()
     flat = arr.reshape(arr.shape[0], -1)          # (bsize, chunk_size*max_action_dim)
 
-    mode, write_header = "a", False
-    if not _FRESH["init"]:                         # primer log del proceso -> limpio
-        mode, write_header, _FRESH["init"] = "w", True, True
+    first = path not in _FRESH
+    mode = "w" if first else "a"
+    write_header = first or (not p.exists()) or p.stat().st_size == 0
+    if first:
+        _FRESH.add(path)
         print(f"[pi0] logging denoise -> {p.resolve()}", flush=True)
-    elif (not p.exists()) or p.stat().st_size == 0:
-        write_header = True
 
     with p.open(mode, newline="") as f:
         w = csv.writer(f)
@@ -191,9 +122,19 @@ def sample_actions(self, images, img_masks, lang_tokens, lang_masks, state,
     if noise is None:
         actions_shape = (bsize, self.config.chunk_size, self.config.max_action_dim)
         noise = self.sample_noise(actions_shape, device)
-        scale = _load_noise_scale(actions_shape, device)
+        # Ruido AMPLIADO (opcional): si el cliente envio una escala por dimension
+        # con model.set_context(noise_scale=[...]), multiplicamos el N(0,1) por ella
+        # -> cada dim cubre un area comparable a la magnitud de los datos. Sin escala,
+        # ruido N(0,1) normal. La escala se guarda en el modelo (set_context).
+        scale = getattr(self, "_pi0_noise_scale", None)
         if scale is not None:
-            noise = noise * scale        # ruido escalado por dim (area mucho mayor)
+            s = torch.as_tensor(np.asarray(scale, dtype="float32"), device=device)
+            expected = int(actions_shape[1]) * int(actions_shape[2])
+            if s.numel() != expected:
+                raise ValueError(
+                    f"noise_scale tiene {s.numel()} dims != esperado {expected} "
+                    "(chunk_size*max_action_dim).")
+            noise = noise * s.reshape(1, actions_shape[1], actions_shape[2])
     # Prefijo (imagenes + lenguaje): se computa UNA vez y se cachea en KV.
     prefix_embs, prefix_pad_masks, prefix_att_masks = self.embed_prefix(
         images, img_masks, lang_tokens, lang_masks)
@@ -218,7 +159,9 @@ def sample_actions(self, images, img_masks, lang_tokens, lang_masks, state,
     x_t = noise
     call_idx = _next_call_index()
     step = int(getattr(self, "_pi0_step", -1))         # paso del entorno (set_context)
-    _log_denoise(step, call_idx, 0, 1.0, num_steps, x_t)   # iteracion 0 = ruido inicial
+    # Ruta del CSV: override por set_context(csv_path=...), si no la de PI0_DENOISE_CSV.
+    csv_path = getattr(self, "_pi0_csv", None) or _denoise_csv_path()
+    _log_denoise(csv_path, step, call_idx, 0, 1.0, num_steps, x_t)   # iteracion 0 = ruido
 
     time = torch.tensor(1.0, dtype=torch.float32, device=device)
     iteration = 0
@@ -230,7 +173,7 @@ def sample_actions(self, images, img_masks, lang_tokens, lang_masks, state,
         time += dt
         iteration += 1
         # Registra el x_t predicho tras este paso (tiempo t ya actualizado).
-        _log_denoise(step, call_idx, iteration, float(time), num_steps, x_t)
+        _log_denoise(csv_path, step, call_idx, iteration, float(time), num_steps, x_t)
 
     return x_t
 

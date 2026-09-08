@@ -88,16 +88,30 @@ class PiZeroController(Model):
         if getattr(self, "policy", None) is not None and hasattr(self.policy, "reset"):
             self.policy.reset()
 
-    def set_context(self, step=None, **kwargs):
+    def set_context(self, step=None, noise_scale=None, csv_path=None, **kwargs):
         """
-        Metadatos para el logging del denoising (ver models/Pi_zero/patches.py).
-        El cliente los envia con `RemoteModel.set_context(...)`. Hoy soporta `step`
-        (el paso del entorno), que se guarda en el modelo interno para que
-        `sample_actions` lo escriba en la columna `step` del CSV.
+        Contexto en caliente para el modelo (lo envia el cliente con
+        `RemoteModel.set_context(...)`; ver models/Pi_zero/patches.py). Todo se
+        guarda como atributos del modelo interno para que `sample_actions` los use:
+
+        - step        : paso del entorno -> columna `step` del CSV.
+        - noise_scale : lista/array de `chunk_size*max_action_dim` con la escala por
+                        dimension del ruido inicial del flow-matching. El ruido N(0,1)
+                        se multiplica por ella (area mayor). `[]` la desactiva
+                        (vuelve al ruido N(0,1) normal).
+        - csv_path    : ruta del CSV de logging (para escribir a un archivo distinto
+                        sin pisar el original). `""` vuelve al default (PI0_DENOISE_CSV).
         """
         model = getattr(getattr(self, "policy", None), "model", None)
-        if model is not None and step is not None:
+        if model is None:
+            return
+        if step is not None:
             model._pi0_step = int(step)
+        if noise_scale is not None:
+            model._pi0_noise_scale = (
+                None if len(noise_scale) == 0 else np.asarray(noise_scale, dtype="float32"))
+        if csv_path is not None:
+            model._pi0_csv = str(csv_path) or None
 
     # ------------------------------------------------------------------ #
     #  Bajo nivel: carga e inferencia
