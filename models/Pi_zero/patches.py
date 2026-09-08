@@ -43,6 +43,7 @@ import os
 import types
 from pathlib import Path
 
+import numpy as np
 import torch
 from torch import Tensor
 
@@ -65,6 +66,74 @@ def _next_call_index() -> int:
 def _denoise_csv_path() -> str:
     # Ruta del CSV; override con PI0_DENOISE_CSV. Vacio ("") desactiva el log.
     return os.environ.get("PI0_DENOISE_CSV", "output/pi0_denoise/denoise_log.csv")
+
+
+# --------------------------------------------------------------------------- #
+#  Escala del ruido inicial del flow-matching
+# --------------------------------------------------------------------------- #
+_NOISE_SCALE = {"loaded": False, "arr": None}
+
+
+def _load_noise_scale(actions_shape, device):
+    """
+    Escala por dimension para el ruido inicial. Si la variable de entorno
+    PI0_NOISE_SCALE apunta a un .npy (vector de `chunk_size*max_action_dim`,
+    p. ej. generado con scripts/make_noise_scale.py), el ruido N(0,1) se
+    MULTIPLICA por esa escala -> cada dimension cubre un area comparable a la
+    magnitud de los datos, mucho mayor que el N(0,1) estandar. Sin la variable,
+    devuelve None (ruido N(0,1) normal).
+    """
+    if not _NOISE_SCALE["loaded"]:
+        _NOISE_SCALE["loaded"] = True
+        path = os.environ.get("PI0_NOISE_SCALE", "")
+        if path:
+            vec = np.load(path).astype("float32").reshape(-1)
+            _NOISE_SCALE["arr"] = vec
+            print(f"[pi0] ruido ESCALADO: escala cargada de {path} "
+                  f"(dim {vec.size}, media {float(vec.mean()):.4g})", flush=True)
+    vec = _NOISE_SCALE["arr"]
+    if vec is None:
+        return None
+    expected = int(actions_shape[1]) * int(actions_shape[2])
+    if vec.size != expected:
+        raise ValueError(
+            f"PI0_NOISE_SCALE tiene dim {vec.size} != esperado {expected} "
+            f"(chunk_size*max_action_dim). Regenera con scripts/make_noise_scale.py.")
+    return torch.as_tensor(vec, device=device).reshape(
+        1, int(actions_shape[1]), int(actions_shape[2]))
+
+
+# --------------------------------------------------------------------------- #
+#  Ruido inicial AMPLIADO (opcional)
+#  Por defecto pi0 arranca el flow-matching con ruido N(0,1). Si defines
+#  PI0_NOISE_STD=<archivo .npy> con la std por dimension de las acciones finales,
+#  el ruido se escala por esa std (mismo espacio normalizado que x_t), cubriendo
+#  un area mucho mayor. PI0_NOISE_SCALE (default 1.0) permite amplificar mas.
+# --------------------------------------------------------------------------- #
+_NOISE_STD = {"loaded": False, "arr": None}
+
+
+def _noise_std_tensor(model, device):
+    if not _NOISE_STD["loaded"]:
+        _NOISE_STD["loaded"] = True
+        path = os.environ.get("PI0_NOISE_STD", "").strip()
+        if path and os.path.exists(path):
+            vec = np.load(path).astype("float32").reshape(-1)
+            cs, ad = int(model.config.chunk_size), int(model.config.max_action_dim)
+            if vec.size != cs * ad:
+                print(f"[pi0] PI0_NOISE_STD tiene {vec.size} dims != {cs * ad}; "
+                      "uso ruido estandar.", flush=True)
+            else:
+                scale = float(os.environ.get("PI0_NOISE_SCALE", "1.0"))
+                _NOISE_STD["arr"] = (torch.tensor(vec.reshape(cs, ad),
+                                                  dtype=torch.float32, device=device)
+                                     * scale)
+                print(f"[pi0] ruido AMPLIADO: std por dim de {path} (x{scale})",
+                      flush=True)
+        elif path:
+            print(f"[pi0] PI0_NOISE_STD='{path}' no existe; uso ruido estandar.",
+                  flush=True)
+    return _NOISE_STD["arr"]
 
 
 def _log_denoise(step, call_idx, iteration, t_value, num_steps, x_t):
@@ -122,6 +191,9 @@ def sample_actions(self, images, img_masks, lang_tokens, lang_masks, state,
     if noise is None:
         actions_shape = (bsize, self.config.chunk_size, self.config.max_action_dim)
         noise = self.sample_noise(actions_shape, device)
+        scale = _load_noise_scale(actions_shape, device)
+        if scale is not None:
+            noise = noise * scale        # ruido escalado por dim (area mucho mayor)
     # Prefijo (imagenes + lenguaje): se computa UNA vez y se cachea en KV.
     prefix_embs, prefix_pad_masks, prefix_att_masks = self.embed_prefix(
         images, img_masks, lang_tokens, lang_masks)

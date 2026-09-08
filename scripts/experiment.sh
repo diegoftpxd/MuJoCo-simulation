@@ -32,6 +32,14 @@ BENCH_ENV=openvla
 PORT_JUPYTER=2849
 export HF_HOME="${HF_HOME:-$PWD/hf_cache}"    # cache de pesos compartido
 
+# (opcional, pi0) ruido inicial ESCALADO del flow-matching + CSV de salida propio.
+#   PI0_NOISE_SCALE: .npy con la escala por dimension (scripts/make_noise_scale.py).
+#   PI0_DENOISE_CSV: ruta del CSV de logging (usa otra para no pisar el original).
+# Se pueden definir al lanzar:  PI0_NOISE_SCALE=... PI0_DENOISE_CSV=... sbatch ...
+# Solo se exportan si vienen con valor (exportar PI0_DENOISE_CSV="" DESACTIVA el log).
+if [ -n "${PI0_NOISE_SCALE:-}" ]; then export PI0_NOISE_SCALE; fi
+if [ -n "${PI0_DENOISE_CSV:-}"  ]; then export PI0_DENOISE_CSV;  fi
+
 source ~/miniforge3/etc/profile.d/conda.sh
 mkdir -p slurm/logs
 
@@ -49,7 +57,7 @@ if ! conda run -n "${MODEL_ENV}" python -c "${CHECK}" 2>/dev/null; then
     else
         echo "    # (env de OpenVLA/LIBERO; ver scripts/script.sh)"
     fi
-    echo "Luego vuelve a lanzar: sbatch scripts/scriptExperiment.sh"
+    echo "Luego vuelve a lanzar: sbatch scripts/experiment.sh"
     exit 1
 fi
 
