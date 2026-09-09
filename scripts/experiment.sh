@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=40gb
 #SBATCH --partition=ialab-low-unlimit
-#SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:1
 #SBATCH --qos=debug
 #SBATCH --output=slurm/logs/%x.log
 #SBATCH --time=1:00:00
@@ -95,8 +95,8 @@ done
 #     El benchmark (render MuJoCo/EGL + cualquier torch) usa la GPU 1, para no
 #     competir con el servidor del modelo (GPU 0). MUJOCO_EGL_DEVICE_ID elige la
 #     tarjeta de render de MuJoCo; CUDA_VISIBLE_DEVICES aisla torch a esa GPU.
-export CUDA_VISIBLE_DEVICES=1
-export MUJOCO_EGL_DEVICE_ID=1
+export CUDA_VISIBLE_DEVICES=""
+#export MUJOCO_EGL_DEVICE_ID=1
 conda activate "${BENCH_ENV}"
 which jupyter
 echo ""
