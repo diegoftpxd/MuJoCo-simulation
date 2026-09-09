@@ -92,11 +92,18 @@ done
 # --- 4) Arrancar JUPYTER en el entorno del benchmark ----------------------- #
 #     En el notebook:  from models.serving import RemoteModel
 #                      model = RemoteModel(url="http://localhost:${PORT_MODEL}")
-#     El benchmark (render MuJoCo/EGL + cualquier torch) usa la GPU 1, para no
-#     competir con el servidor del modelo (GPU 0). MUJOCO_EGL_DEVICE_ID elige la
-#     tarjeta de render de MuJoCo; CUDA_VISIBLE_DEVICES aisla torch a esa GPU.
+#     El notebook (benchmark) corre SIN GPU: la unica tarjeta la usa en EXCLUSIVA
+#     el servidor del modelo (GPU 0, ver paso 2). Por eso el render headless de
+#     MuJoCo/LIBERO va por OSMesa (software/CPU), NO por EGL, que exige una GPU.
+#     - CUDA_VISIBLE_DEVICES="" -> el proceso del benchmark no ve ninguna GPU.
+#     - MUJOCO_GL=osmesa        -> mujoco renderiza por CPU. Necesita libOSMesa en
+#                                  el env; instalala en el LOGIN node (con internet):
+#                                     conda install -n openvla -c conda-forge mesalib
+#     Con MUJOCO_GL=osmesa, robosuite NO toca EGL, asi que CUDA_VISIBLE_DEVICES=""
+#     ya no rompe el parser de dispositivos. El render por CPU es mas lento que EGL,
+#     pero deja la GPU 0 entera para pi0.
 export CUDA_VISIBLE_DEVICES=""
-#export MUJOCO_EGL_DEVICE_ID=1
+export MUJOCO_GL=osmesa
 
 
 conda activate "${BENCH_ENV}"
