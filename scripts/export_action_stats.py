@@ -25,6 +25,14 @@ Variables opcionales:
 
 import json
 import os
+import sys
+
+# Agrega la raiz del repo al sys.path para poder importar `models` sin importar
+# desde donde se lance el script (al correr `python scripts/xxx.py`, Python pone
+# scripts/ en el path, no la raiz).
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
 
 import numpy as np
 import torch
