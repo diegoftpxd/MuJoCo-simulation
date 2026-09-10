@@ -88,7 +88,8 @@ class PiZeroController(Model):
         if getattr(self, "policy", None) is not None and hasattr(self.policy, "reset"):
             self.policy.reset()
 
-    def set_context(self, step=None, noise_scale=None, csv_path=None, **kwargs):
+    def set_context(self, step=None, noise_scale=None, csv_path=None,
+                    noise_mean=None, dist=None, **kwargs):
         """
         Contexto en caliente para el modelo (lo envia el cliente con
         `RemoteModel.set_context(...)`; ver models/Pi_zero/patches.py). Todo se
@@ -99,6 +100,14 @@ class PiZeroController(Model):
                         dimension del ruido inicial del flow-matching. El ruido N(0,1)
                         se multiplica por ella (area mayor). `[]` la desactiva
                         (vuelve al ruido N(0,1) normal).
+        - noise_mean  : lista/array de `chunk_size*max_action_dim` con la media por
+                        dimension del ruido inicial. Se SUMA al ruido (tras escalar):
+                        N(0, scale) -> N(mean, scale). Con dos medias distintas se
+                        generan dos clusters de ruido inicial disjuntos. `[]` la
+                        desactiva (ruido centrado en 0).
+        - dist        : etiqueta entera (1 o 2) de la distribucion normal del ruido
+                        inicial -> columna `dist` del CSV. Sirve para marcar de que
+                        gaussiana vino cada corrida en el experimento de 2 clusters.
         - csv_path    : ruta del CSV de logging (para escribir a un archivo distinto
                         sin pisar el original). `""` vuelve al default (PI0_DENOISE_CSV).
         """
@@ -110,6 +119,11 @@ class PiZeroController(Model):
         if noise_scale is not None:
             model._pi0_noise_scale = (
                 None if len(noise_scale) == 0 else np.asarray(noise_scale, dtype="float32"))
+        if noise_mean is not None:
+            model._pi0_noise_mean = (
+                None if len(noise_mean) == 0 else np.asarray(noise_mean, dtype="float32"))
+        if dist is not None:
+            model._pi0_dist = int(dist)
         if csv_path is not None:
             model._pi0_csv = str(csv_path) or None
 

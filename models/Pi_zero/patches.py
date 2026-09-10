@@ -68,7 +68,7 @@ def _denoise_csv_path() -> str:
     return os.environ.get("PI0_DENOISE_CSV", "output/pi0_denoise/denoise_log.csv")
 
 
-def _log_denoise(path, step, call_idx, iteration, t_value, num_steps, x_t):
+def _log_denoise(path, step, call_idx, iteration, t_value, num_steps, x_t, dist=0):
     """
     Agrega al CSV `path` una fila por muestra del batch con el vector `x_t`
     aplanado y los metadatos del paso. La PRIMERA escritura a cada ruta en este
@@ -76,6 +76,9 @@ def _log_denoise(path, step, call_idx, iteration, t_value, num_steps, x_t):
 
     `step` = paso del entorno (lo fija el cliente con model.set_context(step=...);
     -1 si no se seteo). Permite agrupar corridas por estado del entorno.
+    `dist` = etiqueta de la distribucion normal del ruido inicial (0 = sin marcar,
+    1 o 2 en el experimento de dos gaussianas; model.set_context(dist=...)). Permite
+    saber, en el analisis, de que cluster inicial vino cada corrida.
     """
     if not path:                                  # ruta vacia -> sin log
         return
@@ -95,11 +98,11 @@ def _log_denoise(path, step, call_idx, iteration, t_value, num_steps, x_t):
     with p.open(mode, newline="") as f:
         w = csv.writer(f)
         if write_header:
-            cols = ["step", "call", "batch", "iteration", "time", "num_steps"]
+            cols = ["step", "dist", "call", "batch", "iteration", "time", "num_steps"]
             cols += [f"v{i}" for i in range(flat.shape[1])]
             w.writerow(cols)
         for b in range(flat.shape[0]):
-            w.writerow([int(step), call_idx, b, iteration, float(t_value),
+            w.writerow([int(step), int(dist), call_idx, b, iteration, float(t_value),
                         int(num_steps), *flat[b].tolist()])
 
 
@@ -135,6 +138,20 @@ def sample_actions(self, images, img_masks, lang_tokens, lang_masks, state,
                     f"noise_scale tiene {s.numel()} dims != esperado {expected} "
                     "(chunk_size*max_action_dim).")
             noise = noise * s.reshape(1, actions_shape[1], actions_shape[2])
+        # Media DESPLAZADA (opcional): si el cliente envio una media por dimension
+        # con model.set_context(noise_mean=[...]), la SUMAMOS al ruido -> el ruido
+        # inicial pasa de N(0, scale) a N(mean, scale). Con dos medias distintas
+        # (dos llamadas set_context con noise_mean diferentes) se generan dos
+        # clusters de ruido inicial "super disjuntos". Sin media, ruido centrado.
+        mean = getattr(self, "_pi0_noise_mean", None)
+        if mean is not None:
+            m = torch.as_tensor(np.asarray(mean, dtype="float32"), device=device)
+            expected = int(actions_shape[1]) * int(actions_shape[2])
+            if m.numel() != expected:
+                raise ValueError(
+                    f"noise_mean tiene {m.numel()} dims != esperado {expected} "
+                    "(chunk_size*max_action_dim).")
+            noise = noise + m.reshape(1, actions_shape[1], actions_shape[2])
     # Prefijo (imagenes + lenguaje): se computa UNA vez y se cachea en KV.
     prefix_embs, prefix_pad_masks, prefix_att_masks = self.embed_prefix(
         images, img_masks, lang_tokens, lang_masks)
@@ -159,9 +176,10 @@ def sample_actions(self, images, img_masks, lang_tokens, lang_masks, state,
     x_t = noise
     call_idx = _next_call_index()
     step = int(getattr(self, "_pi0_step", -1))         # paso del entorno (set_context)
+    dist = int(getattr(self, "_pi0_dist", 0))          # distribucion del ruido (set_context)
     # Ruta del CSV: override por set_context(csv_path=...), si no la de PI0_DENOISE_CSV.
     csv_path = getattr(self, "_pi0_csv", None) or _denoise_csv_path()
-    _log_denoise(csv_path, step, call_idx, 0, 1.0, num_steps, x_t)   # iteracion 0 = ruido
+    _log_denoise(csv_path, step, call_idx, 0, 1.0, num_steps, x_t, dist)   # iteracion 0 = ruido
 
     time = torch.tensor(1.0, dtype=torch.float32, device=device)
     iteration = 0
@@ -173,7 +191,7 @@ def sample_actions(self, images, img_masks, lang_tokens, lang_masks, state,
         time += dt
         iteration += 1
         # Registra el x_t predicho tras este paso (tiempo t ya actualizado).
-        _log_denoise(csv_path, step, call_idx, iteration, float(time), num_steps, x_t)
+        _log_denoise(csv_path, step, call_idx, iteration, float(time), num_steps, x_t, dist)
 
     return x_t
 
