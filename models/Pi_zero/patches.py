@@ -52,6 +52,30 @@ from lerobot.policies.pi0.modeling_pi0 import make_att_2d_masks
 
 
 # --------------------------------------------------------------------------- #
+#  Restriccion de rango del gripper (pinza) en el flow-matching
+# --------------------------------------------------------------------------- #
+# Indice de la dimension de la PINZA dentro de cada paso de accion (el ultimo eje
+# de x_t, de tamano max_action_dim). El vector de accion de pi0-LIBERO es
+# [x, y, z, roll, pitch, yaw, gripper, ...padding], asi que el gripper es la
+# dim 6 (mismo valor que "gripper_dim" en scripts/export_action_stats.py).
+GRIPPER_DIM = 6
+# Rango valido de la pinza. Un gripper fuera de [0, 1] es un estado "irreal":
+# lo forzamos a este intervalo SOLO en el VECTOR INICIAL del flow-matching (el
+# ruido de partida), para no arrancar el muestreo desde una magnitud de gripper
+# sin sentido. El paso de Euler NO se toca: la dinamica del denoising queda igual.
+GRIPPER_MIN, GRIPPER_MAX = 0.0, 1.0
+
+
+def _clamp_gripper(x_t):
+    """Fuerza in-place la dim del gripper de `x_t` (bsize, chunk, max_action_dim)
+    al rango [GRIPPER_MIN, GRIPPER_MAX]. Solo toca la coordenada de la pinza; el
+    resto del vector queda intacto."""
+    if x_t.shape[-1] > GRIPPER_DIM:
+        x_t[..., GRIPPER_DIM].clamp_(GRIPPER_MIN, GRIPPER_MAX)
+    return x_t
+
+
+# --------------------------------------------------------------------------- #
 #  Logging del denoising a CSV
 # --------------------------------------------------------------------------- #
 _CALL_COUNT = {"n": 0}      # nº de llamados a sample_actions en este proceso
@@ -174,6 +198,11 @@ def sample_actions(self, images, img_masks, lang_tokens, lang_masks, state,
     dt = torch.tensor(dt, dtype=torch.float32, device=device)
 
     x_t = noise
+    # Gripper realista en el VECTOR INICIAL: por muy desplazado/escalado que quede
+    # el ruido (noise_scale / noise_mean) o el noise que envie el cliente, la pinza
+    # no puede PARTIR de un valor imposible. La forzamos a [0, 1] antes de empezar
+    # el denoising (y el log de la iteracion 0 ya registra el valor corregido).
+    _clamp_gripper(x_t)
     call_idx = _next_call_index()
     step = int(getattr(self, "_pi0_step", -1))         # paso del entorno (set_context)
     dist = int(getattr(self, "_pi0_dist", 0))          # distribucion del ruido (set_context)
