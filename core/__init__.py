@@ -13,6 +13,7 @@ from .action import Action
 from .episode import EpisodeResult, StepResult, VideoRecorder, run_episode
 from .experiment import run_experiments, summarize
 from .observation import Observation, View
+from .registry import LazyRegistry
 
 __all__ = [
     "Observation",
@@ -24,4 +25,5 @@ __all__ = [
     "VideoRecorder",
     "run_experiments",
     "summarize",
+    "LazyRegistry",
 ]

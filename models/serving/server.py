@@ -22,47 +22,40 @@ Endpoints:
 """
 
 import argparse
+import inspect
 import json
 import threading
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from models import ModelFactory
 from models.serving import wire
 
 
 # --------------------------------------------------------------------------- #
-#  Registro de modelos: nombre -> funcion que construye el controller.
-#  Los imports son perezosos (dentro de cada builder) para que este modulo se
-#  pueda importar sin torch/lerobot/transformers.
+#  Construccion del modelo desde el registro (models/factory.py).
+#  El servidor es GENERICO: no conoce los args de cada modelo. Reune todos los
+#  kwargs posibles del CLI y le pasa a cada controlador SOLO los que declara en
+#  su __init__ (via inspeccion de la firma). Asi agregar un modelo con opciones
+#  propias no obliga a tocar este archivo: basta registrarlo en ModelFactory y,
+#  si su opcion no esta ya en el CLI, exponerla como un flag mas abajo.
 # --------------------------------------------------------------------------- #
-def _build_pi0(args):
-    from models.Pi_zero import PiZeroController
-    kw = dict(device=args.device, view=args.view)
-    if args.model_id:
-        kw["model_id"] = args.model_id
-    return PiZeroController(**kw)
-
-
-def _build_openvla(args):
-    from models.OpenVLA import OpenVLAController
-    kw = dict(device=args.device, view=args.view, center_crop=args.center_crop)
-    if args.model_id:
-        kw["model_id"] = args.model_id
-    if args.unnorm_key:
-        kw["unnorm_key"] = args.unnorm_key
-    return OpenVLAController(**kw)
-
-
-def _build_random(args):
-    from models.Random import RandomController
-    return RandomController()
-
-
-BUILDERS = {
-    "pi0": _build_pi0,
-    "openvla": _build_openvla,
-    "random": _build_random,
-}
+def _build_model(args):
+    target = ModelFactory.get(args.model)      # resuelve la clase (import perezoso)
+    candidates = {
+        "device": args.device,
+        "view": args.view,
+        "model_id": args.model_id,
+        "unnorm_key": args.unnorm_key,          # especifico de OpenVLA
+        "center_crop": args.center_crop,        # especifico de OpenVLA
+    }
+    params = inspect.signature(target).parameters
+    accepts_var_kw = any(p.kind is p.VAR_KEYWORD for p in params.values())
+    # Pasa un kwarg solo si el controlador lo acepta (o acepta **kwargs) y no es
+    # None (para no pisar los defaults del propio controlador, p. ej. model_id).
+    kwargs = {k: v for k, v in candidates.items()
+              if v is not None and (accepts_var_kw or k in params)}
+    return target(**kwargs)
 
 
 # --------------------------------------------------------------------------- #
@@ -141,7 +134,7 @@ def serve(model, host="127.0.0.1", port=9000):
 
 def main():
     ap = argparse.ArgumentParser(description="Servidor de inferencia generico.")
-    ap.add_argument("--model", required=True, choices=sorted(BUILDERS),
+    ap.add_argument("--model", required=True, choices=ModelFactory.available(),
                     help="Que modelo servir.")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=9000)
@@ -158,7 +151,7 @@ def main():
     args = ap.parse_args()
 
     print(f"Cargando modelo '{args.model}' (esto puede tardar)...", flush=True)
-    model = BUILDERS[args.model](args)
+    model = _build_model(args)
     serve(model, args.host, args.port)
 
 
