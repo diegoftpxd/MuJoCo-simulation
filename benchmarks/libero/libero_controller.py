@@ -24,7 +24,7 @@ os.environ.setdefault("MUJOCO_GL", "egl")   # render headless (antes de mujoco)
 import numpy as np
 
 from benchmarks.benchmark import BenchMark
-from core import Observation, StepResult, View
+from core import Capabilities, Observation, StepResult, View
 
 _PKG_DIR = os.path.dirname(os.path.abspath(__file__))   # benchmarks/libero
 
@@ -95,6 +95,16 @@ class LiberoController(BenchMark):
     def num_episodes(self) -> int:
         """Configuraciones iniciales disponibles para esta tarea."""
         return len(self._init_states)
+
+    def capabilities(self) -> Capabilities:
+        # Ofrece SIEMPRE la vista `agentview`, la instruccion y el estado que
+        # necesita pi0 (eef_pos, eef_quat, gripper_qpos). La vista de muñeca solo
+        # aparece si el env la trae; como ningun modelo la REQUIERE, no se declara
+        # (el runner igual valida contra la observacion real como red de seguridad).
+        return Capabilities.of(
+            views=[View.AGENT],
+            state=["eef_pos", "eef_quat", "gripper_qpos"],
+            instruction=True)
 
     @classmethod
     def tasks(cls, suite="libero_10"):

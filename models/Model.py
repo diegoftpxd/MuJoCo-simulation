@@ -10,7 +10,7 @@ tocar el benchmark.
 from abc import ABC, abstractmethod
 from typing import List
 
-from core import Action, Observation
+from core import Action, Capabilities, Observation
 
 
 class Model(ABC):
@@ -28,3 +28,16 @@ class Model(ABC):
 
     def reset(self):
         """Reinicia el estado interno del modelo entre episodios (opcional)."""
+
+    def requirements(self) -> Capabilities:
+        """
+        Vistas / estados / instruccion que este modelo NECESITA de la
+        `Observation`. El runner las compara con lo que ofrece el benchmark
+        (`BenchMark.capabilities()`) ANTES de correr, para fallar temprano y
+        claro si algo falta (ver core/capabilities.py).
+
+        Por defecto no requiere nada (retrocompatible). Cada modelo la
+        sobreescribe declarando lo que consume; puede depender de su config
+        (p. ej. la vista elegida), por eso es un metodo de instancia.
+        """
+        return Capabilities()

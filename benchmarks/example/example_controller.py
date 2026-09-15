@@ -8,7 +8,7 @@ de la `Action`. Muestra el patron que luego siguen los benchmarks reales.
 """
 
 from benchmarks.benchmark import BenchMark
-from core import Observation, StepResult, View
+from core import Capabilities, Observation, StepResult, View
 from robots import Frame, PoseDelta, RobotFactory
 from simulation import Simulation
 
@@ -34,6 +34,15 @@ class ExampleController(BenchMark):
     @property
     def instruction(self) -> str:
         return self._instruction
+
+    def capabilities(self) -> Capabilities:
+        # Ofrece 3 vistas y propriocepcion basica (ver `_observe`). OJO: NO ofrece
+        # `agentview` (la vista por defecto de OpenVLA/pi0), asi que el contrato
+        # atrapara ese mismatch antes de correr.
+        return Capabilities.of(
+            views=list(self._cameras),
+            state=["joint_positions", "tcp"],
+            instruction=True)
 
     def _observe(self) -> Observation:
         n = self.image_size

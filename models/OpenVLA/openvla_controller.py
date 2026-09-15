@@ -9,7 +9,7 @@ modulo se pueda importar sin ellos). Selecciona la vista que necesita de la
 
 import numpy as np
 
-from core import Action, View
+from core import Action, Capabilities, View
 from models.Model import Model
 
 DEFAULT_MODEL = "openvla/openvla-7b-finetuned-libero-10"
@@ -45,6 +45,11 @@ class OpenVLAController(Model):
     # ------------------------------------------------------------------ #
     #  Interfaz comun (Model)
     # ------------------------------------------------------------------ #
+    def requirements(self) -> Capabilities:
+        # Necesita su vista (la que elija por config) y la instruccion en
+        # lenguaje natural para armar el prompt. No usa propriocepcion.
+        return Capabilities.of(views=[self.view], instruction=True)
+
     def act(self, observation) -> list:
         image = observation.image(self.view)          # el modelo ELIGE su vista
         if self.center_crop:

@@ -85,6 +85,11 @@ class _Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/health":
             self._send(200, "ok", "text/plain")
+        elif self.path == "/capabilities":
+            # Contrato de capacidades: el benchmark (en otro proceso) valida lo
+            # que este modelo REQUIERE contra lo que el ofrece. Ver core/capabilities.py.
+            body = json.dumps(self.model.requirements().to_dict())
+            self._send(200, body, "application/json")
         else:
             self._send(404, "not found", "text/plain")
 

@@ -10,6 +10,8 @@ benchmarks y modelos.
 """
 
 from .action import Action
+from .capabilities import (Capabilities, IncompatibleCapabilities,
+                           check_compatibility)
 from .episode import EpisodeResult, StepResult, VideoRecorder, run_episode
 from .experiment import run_experiments, summarize
 from .observation import Observation, View
@@ -26,4 +28,7 @@ __all__ = [
     "run_experiments",
     "summarize",
     "LazyRegistry",
+    "Capabilities",
+    "check_compatibility",
+    "IncompatibleCapabilities",
 ]

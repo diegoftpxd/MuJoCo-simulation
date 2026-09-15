@@ -31,7 +31,7 @@ config (`policy.config.input_features` / `output_features`):
 """
 
 import numpy as np
-from core import Action, View
+from core import Action, Capabilities, View
 from models.Model import Model
 
 DEFAULT_MODEL = "lerobot/pi0_libero_finetuned"
@@ -72,6 +72,15 @@ class PiZeroController(Model):
     # ------------------------------------------------------------------ #
     #  Interfaz comun (Model)
     # ------------------------------------------------------------------ #
+    def requirements(self) -> Capabilities:
+        # pi0-LIBERO necesita su vista principal, la instruccion, y el estado de
+        # 8 dims que arma `_state_vector`: eef_pos, eef_quat y gripper_qpos. La
+        # vista de muñeca (wrist_view) es OPCIONAL -> no va en los requisitos.
+        return Capabilities.of(
+            views=[self.view],
+            state=["eef_pos", "eef_quat", "gripper_qpos"],
+            instruction=True)
+
     def act(self, observation) -> list:
         # Camino oficial (examples/tutorial/pi0): preprocess -> select_action ->
         # postprocess. Devolvemos UNA accion; `select_action` sirve de su cola

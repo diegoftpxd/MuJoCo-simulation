@@ -19,6 +19,7 @@ Uso en el notebook del benchmark:
 import json
 import urllib.request
 
+from core import Capabilities
 from models.Model import Model
 from models.serving import wire
 
@@ -40,9 +41,15 @@ class RemoteModel(Model):
         """
         self.url = url.rstrip("/")
         self.timeout = timeout
+        self._requirements = None      # cache del contrato (no cambia entre episodios)
 
     def _post(self, path, body=b"") -> bytes:
         req = urllib.request.Request(self.url + path, data=body, method="POST")
+        with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            return resp.read()
+
+    def _get(self, path) -> bytes:
+        req = urllib.request.Request(self.url + path, method="GET")
         with urllib.request.urlopen(req, timeout=self.timeout) as resp:
             return resp.read()
 
@@ -57,6 +64,21 @@ class RemoteModel(Model):
     def act(self, observation) -> list:
         blob = wire.dump_observation(observation)
         return wire.load_actions(self._post("/act", blob))
+
+    def requirements(self) -> Capabilities:
+        """
+        Capacidades que REQUIERE el modelo remoto (contrato modelo <-> benchmark).
+        Las pide una vez al endpoint /capabilities del servidor y las cachea. Si
+        el servidor es viejo y no lo soporta, devuelve capacidades vacias (sin
+        requisitos): no rompe, solo desactiva la validacion para ese modelo.
+        """
+        if self._requirements is None:
+            try:
+                data = json.loads(self._get("/capabilities").decode("utf-8"))
+                self._requirements = Capabilities.from_dict(data)
+            except Exception:                       # noqa: BLE001
+                self._requirements = Capabilities()
+        return self._requirements
 
     def set_context(self, **kwargs):
         """
