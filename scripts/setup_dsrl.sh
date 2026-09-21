@@ -1,12 +1,31 @@
 #!/bin/bash
+#SBATCH --job-name=setup_dsrl          # crea el entorno conda dsrl (Opcion A)
+#SBATCH --mail-type=END,FAIL
+#SBATCH --mail-user=diego.toledo@uc.cl
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=40gb
+#SBATCH --partition=ialab-low-unlimit
+#SBATCH --gres=gpu:2080_ti:1           # 1 GPU: para que jax.devices() confirme CUDA
+#SBATCH --qos=debug
+#SBATCH --output=slurm/logs/%x.log
+#SBATCH --time=2:00:00                 # el pip install (jax/openpi/deps) puede tardar
+#SBATCH --nodelist=scylla
+#
 # setup_dsrl.sh -- crea el entorno conda `dsrl` para servir DSRL-pi0 (Opcion A).
 #
-# CORRER EN EL LOGIN NODE de kraken (necesita internet: clona el repo e instala
-# con pip; los nodos de computo normalmente no tienen red). Idempotente: se puede
-# re-ejecutar (reutiliza el repo/env si ya existen).
+# NECESITA INTERNET (clona el repo e instala con pip). Corre donde tu nodo tenga
+# red: el LOGIN node, o un nodo de computo si tu cluster le da salida. Idempotente:
+# se puede re-ejecutar (reutiliza el repo/env si ya existen).
 #
-# Uso:
-#     bash scripts/setup_dsrl.sh
+# Formas de correrlo:
+#   - Login node directo:  bash scripts/setup_dsrl.sh
+#   - Batch (usa el #SBATCH de arriba):
+#         mkdir -p slurm/logs && sbatch scripts/setup_dsrl.sh
+#   - Interactivo con srun (srun NO lee los #SBATCH -> pasa los flags a mano):
+#         srun --partition=ialab-low-unlimit --qos=debug --gres=gpu:2080_ti:1 \
+#              --cpus-per-task=8 --mem=40gb --time=2:00:00 --nodelist=scylla \
+#              --pty bash scripts/setup_dsrl.sh
 #
 # Variables opcionales (override por entorno):
 #     DSRL_DIR   destino del clon de dsrl_pi0   (default: ~/dsrl_pi0)
@@ -18,6 +37,8 @@
 #     cd <repo> && AGENT_CKPT=<ckpt> sbatch scripts/experiment.sh   (MODEL=dsrl_pi0)
 
 set -euo pipefail
+pwd; hostname; date
+mkdir -p slurm/logs
 
 # --- Config ---------------------------------------------------------------- #
 DSRL_REPO="${DSRL_REPO:-https://github.com/nakamotoo/dsrl_pi0.git}"
