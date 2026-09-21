@@ -46,10 +46,25 @@ DSRL_DIR="${DSRL_DIR:-$HOME/dsrl_pi0}"
 ENV_NAME="${ENV_NAME:-dsrl}"
 JAX_SPEC="${JAX_SPEC:-jax[cuda12]}"
 
-# Raiz del repo de simulacion (este script vive en <repo>/scripts/).
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SIM_ROOT="$(dirname "$SCRIPT_DIR")"
-ENV_YML="$SIM_ROOT/requirements/environment-dsrl.yml"
+# Raiz del repo de simulacion. Bajo SLURM, `sbatch` copia el script a un spool
+# (/tmp/slurmd/...), asi que BASH_SOURCE NO sirve; usamos, en orden:
+#   1) SLURM_SUBMIT_DIR (dir desde donde lanzaste sbatch/srun = el repo),
+#   2) el dir del script (ejecucion directa `bash scripts/setup_dsrl.sh`),
+#   3) el cwd actual.
+_has_yml() { [ -f "$1/requirements/environment-dsrl.yml" ]; }
+
+SIM_ROOT=""
+if [ -n "${SLURM_SUBMIT_DIR:-}" ] && _has_yml "$SLURM_SUBMIT_DIR"; then
+    SIM_ROOT="$SLURM_SUBMIT_DIR"
+else
+    _sd="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || true)"
+    if [ -n "$_sd" ] && _has_yml "$(dirname "$_sd")"; then
+        SIM_ROOT="$(dirname "$_sd")"
+    elif _has_yml "$PWD"; then
+        SIM_ROOT="$PWD"
+    fi
+fi
+ENV_YML="${SIM_ROOT:-?}/requirements/environment-dsrl.yml"
 
 echo "== setup_dsrl =="
 echo "  repo DSRL : $DSRL_DIR"
