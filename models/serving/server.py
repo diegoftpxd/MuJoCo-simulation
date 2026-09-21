@@ -48,6 +48,9 @@ def _build_model(args):
         "model_id": args.model_id,
         "unnorm_key": args.unnorm_key,          # especifico de OpenVLA
         "center_crop": args.center_crop,        # especifico de OpenVLA
+        "agent_checkpoint": args.agent_checkpoint,  # especifico de DSRL-pi0
+        "dp_checkpoint": args.dp_checkpoint,        # especifico de DSRL-pi0
+        "query_freq": args.query_freq,              # especifico de DSRL-pi0
     }
     params = inspect.signature(target).parameters
     accepts_var_kw = any(p.kind is p.VAR_KEYWORD for p in params.values())
@@ -148,12 +151,23 @@ def main():
                     help="Vista principal que usa el modelo.")
     ap.add_argument("--model-id", default=None,
                     help="Repo HF del checkpoint (default: el del controller).")
-    # Opciones especificas de OpenVLA (pi0 las ignora):
+    # Opciones especificas de OpenVLA (los demas las ignoran):
     ap.add_argument("--unnorm-key", default=None)
     ap.add_argument("--center-crop", dest="center_crop",
                     action="store_true", default=True)
     ap.add_argument("--no-center-crop", dest="center_crop", action="store_false")
+    # Opciones especificas de DSRL-pi0 (los demas las ignoran):
+    ap.add_argument("--agent-checkpoint", dest="agent_checkpoint", default=None,
+                    help="Checkpoint del actor SAC de DSRL (obligatorio para dsrl_pi0).")
+    ap.add_argument("--dp-checkpoint", dest="dp_checkpoint", default=None,
+                    help="Checkpoint de la base pi0 (openpi); default: openpi-assets.")
+    ap.add_argument("--query-freq", dest="query_freq", type=int, default=20,
+                    help="Pasos por chunk antes de re-muestrear el ruido (DSRL).")
     args = ap.parse_args()
+
+    # Aviso temprano y claro si falta lo unico que DSRL necesita de verdad.
+    if args.model == "dsrl_pi0" and not args.agent_checkpoint:
+        ap.error("--model dsrl_pi0 requiere --agent-checkpoint <dir del actor SAC>.")
 
     print(f"Cargando modelo '{args.model}' (esto puede tardar)...", flush=True)
     model = _build_model(args)

@@ -49,6 +49,7 @@ MuJoCo-simulation/
 │   │   └── wire.py           #     serialización Observation / List[Action] (solo numpy)
 │   ├── OpenVLA/              #   OpenVLAController (VLA 7B, torch/transformers)
 │   ├── Pi_zero/              #   PiZeroController + patches.py (flow-matching editable)
+│   ├── DSRL_pi0/             #   DSRLPi0Controller (RL en el ruido de pi0; JAX/openpi)
 │   └── Random/               #   RandomController (política de prueba)
 │
 ├── simulation.py             # Simulation: avance de física, viewer, render, video
@@ -78,7 +79,8 @@ MuJoCo-simulation/
     ├── requirements.txt      #   Dependencias base (mujoco, numpy, imageio, ...)
     ├── requirements-vla.txt  #   Dependencias extra para VLA (torch, transformers)
     ├── environment.yml       #   Entorno conda de simulación
-    └── environment-pizero.yml#   Entorno conda del servidor pi0 (lerobot)
+    ├── environment-pizero.yml#   Entorno conda del servidor pi0 (lerobot)
+    └── environment-dsrl.yml  #   Entorno conda del servidor DSRL-pi0 (JAX/openpi/jaxrl2)
 ```
 
 ---
@@ -273,12 +275,18 @@ benchmarks por nombre (instancia de `LazyRegistry`): `create("example" |
   para modificar el algoritmo de denoising (monkeypatch de `sample_actions`) y
   loguear el proceso a CSV; `set_context(...)` inyecta parámetros en caliente
   (paso, escala/media del ruido inicial, etc.).
+- **`DSRLPi0Controller`** (`models/DSRL_pi0/`) — DSRL (Diffusion Steering via
+  Latent-space RL, [nakamotoo/dsrl_pi0](https://github.com/nakamotoo/dsrl_pi0)):
+  un actor SAC elige el **ruido inicial** en el espacio latente de una base pi0
+  (openpi) y esta lo integra hasta la acción — la versión *aprendida* de lo que
+  `patches.py` hace a mano. Stack propio (JAX + openpi + jaxrl2), su entorno
+  `environment-dsrl.yml`; requiere `--agent-checkpoint` (el actor entrenado).
 - **`RandomController`** (`models/Random/`) — política de prueba: deltas
   cartesianos pequeños al azar. Útil para validar el pipeline sin pesos ni GPU.
 
 **`ModelFactory`** (`models/factory.py`) — registro perezoso de modelos por
 nombre (instancia de `LazyRegistry`). Agregar un modelo = una línea de registro;
-`create("openvla" | "pi0" | "random", **kwargs)`, `available()`.
+`create("openvla" | "pi0" | "dsrl_pi0" | "random", **kwargs)`, `available()`.
 
 **Serving** (`models/serving/`) — sirve cualquier `Model` por HTTP (ver
 *Aislamiento por proceso*).

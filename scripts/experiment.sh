@@ -14,15 +14,25 @@
 pwd; hostname; date
 set -euo pipefail
 
-# --- ELIGE el modelo a servir: pi0 | openvla | random ---------------------- #
+# --- ELIGE el modelo a servir: pi0 | openvla | dsrl_pi0 | random ----------- #
 MODEL=pi0
 
-# --- Mapa modelo -> entorno conda / puerto / chequeo de dependencias ------- #
+# Checkpoint del actor SAC de DSRL (solo aplica a MODEL=dsrl_pi0). Editalo o
+# pasalo por entorno: AGENT_CKPT=/ruta sbatch scripts/experiment.sh
+AGENT_CKPT="${AGENT_CKPT:-}"
+
+# --- Mapa modelo -> entorno conda / puerto / chequeo / args extra ---------- #
+MODEL_ARGS=""
 case "$MODEL" in
-    pi0)     MODEL_ENV=pizero;  PORT_MODEL=9000; CHECK="import lerobot, torch, numpy" ;;
-    openvla) MODEL_ENV=openvla; PORT_MODEL=9001; CHECK="import torch, transformers, numpy" ;;
-    random)  MODEL_ENV=openvla; PORT_MODEL=9002; CHECK="import numpy" ;;
-    *) echo "MODEL desconocido: $MODEL (usa pi0|openvla|random)"; exit 1 ;;
+    pi0)      MODEL_ENV=pizero;  PORT_MODEL=9000; CHECK="import lerobot, torch, numpy" ;;
+    openvla)  MODEL_ENV=openvla; PORT_MODEL=9001; CHECK="import torch, transformers, numpy" ;;
+    random)   MODEL_ENV=openvla; PORT_MODEL=9002; CHECK="import numpy" ;;
+    dsrl_pi0) MODEL_ENV=dsrl;    PORT_MODEL=9003; CHECK="import jax, openpi, jaxrl2"
+              if [ -z "$AGENT_CKPT" ]; then
+                  echo "ERROR: MODEL=dsrl_pi0 requiere AGENT_CKPT=<dir del actor SAC>."; exit 1
+              fi
+              MODEL_ARGS="--agent-checkpoint ${AGENT_CKPT}" ;;
+    *) echo "MODEL desconocido: $MODEL (usa pi0|openvla|dsrl_pi0|random)"; exit 1 ;;
 esac
 
 # Entorno del BENCHMARK (LIBERO + jupyter). NO necesita torch/lerobot/transformers;
@@ -46,8 +56,12 @@ if ! conda run -n "${MODEL_ENV}" python -c "${CHECK}" 2>/dev/null; then
     if [ "$MODEL_ENV" = "pizero" ]; then
         echo "    conda env remove -n pizero -y"
         echo "    conda env create -f requirements/environment-pizero.yml"
+    elif [ "$MODEL_ENV" = "dsrl" ]; then
+        echo "    conda env remove -n dsrl -y"
+        echo "    conda env create -f requirements/environment-dsrl.yml"
+        echo "    # y sigue los PASOS del yml (clonar dsrl_pi0 + submodulos, pip install -e)"
     else
-        echo "    # (env de OpenVLA/LIBERO; ver scripts/script.sh)"
+        echo "    # (env de OpenVLA/LIBERO)"
     fi
     echo "Luego vuelve a lanzar: sbatch scripts/experiment.sh"
     exit 1
@@ -69,7 +83,7 @@ CUDA_VISIBLE_DEVICES=0 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
 TORCHDYNAMO_DISABLE=1 \
 HF_HOME="$HF_HOME" conda run --no-capture-output -n "${MODEL_ENV}" \
     python -m models.serving.server --model "${MODEL}" \
-        --host 127.0.0.1 --port "${PORT_MODEL}" --device cuda \
+        --host 127.0.0.1 --port "${PORT_MODEL}" --device cuda ${MODEL_ARGS} \
     > "${SERVER_LOG}" 2>&1 &
 SERVER_PID=$!
 trap 'echo "Deteniendo servidor ${MODEL} (PID $SERVER_PID)"; kill $SERVER_PID 2>/dev/null || true' EXIT

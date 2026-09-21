@@ -1,0 +1,58 @@
+# Entorno conda del SERVIDOR de DSRL-pi0 (aislamiento por proceso).
+#
+# DSRL-pi0 (https://github.com/nakamotoo/dsrl_pi0) corre SOLO el modelo como
+# servidor de inferencia (`python -m models.serving.server --model dsrl_pi0`). El
+# benchmark LIBERO NO vive aqui: corre en el entorno `openvla` y consume el
+# servidor por HTTP con `RemoteModel`.
+#
+# STACK: JAX (CUDA 12) + openpi (base pi0) + jaxrl2 (actor SAC). Es INCOMPATIBLE
+# con lerobot/torch del entorno `pizero`, por eso va en un entorno propio.
+#
+# IMPORTANTE: DSRL usa un FORK de openpi (el submodulo del repo) cuyo `Policy.infer`
+# acepta el argumento `noise=`. El openpi de PyPI NO lo acepta. Hay que instalar
+# openpi DESDE EL SUBMODULO del repo clonado (no desde PyPI).
+#
+# Crear:    conda env create -f requirements/environment-dsrl.yml
+# Activar:  conda activate dsrl
+#
+# ---------------------------------------------------------------------------
+# PASOS DESPUES DE CREAR EL ENTORNO (en el LOGIN node de kraken, con internet):
+#
+# 1) Clonar el repo DSRL con sus submodulos (openpi y LIBERO):
+#        git clone --recurse-submodules https://github.com/nakamotoo/dsrl_pi0.git
+#        cd dsrl_pi0
+#
+# 2) Instalar JAX con soporte CUDA 12 (ajusta a tu CUDA/driver):
+#        pip install --upgrade "jax[cuda12]"
+#
+# 3) Instalar openpi (el FORK del submodulo) y jaxrl2 (este repo) en editable,
+#    mas las deps del repo:
+#        pip install -e openpi
+#        pip install -e .
+#        pip install -r requirements.txt
+#
+# 4) Dejar el repo importable por el servidor. Como `models/DSRL_pi0` importa
+#    `openpi.*` y `jaxrl2.*`, esos paquetes deben estar en el PYTHONPATH del
+#    entorno (el `pip install -e` de arriba ya los deja instalados).
+#
+# 5) Descargar/ubicar los checkpoints:
+#      - Base pi0 (openpi-assets): se baja solo con `download.maybe_download(...)`.
+#      - Actor DSRL (SAC): el que entrenaste (ver examples/scripts/run_libero.sh);
+#        se pasa al servidor con --agent-checkpoint <dir>.
+#
+# 6) Levantar el servidor (ver scripts/experiment.sh, MODEL=dsrl_pi0):
+#        python -m models.serving.server --model dsrl_pi0 --port 9003 \
+#               --agent-checkpoint <dir_del_actor_SAC> --device cuda
+#
+# Congela con `pip freeze > requirements-dsrl-lock.txt` cuando funcione.
+# ---------------------------------------------------------------------------
+
+name: dsrl
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  # El resto (JAX, openpi, jaxrl2, LIBERO) se instala con pip siguiendo los
+  # PASOS de arriba, porque openpi/jaxrl2 vienen de submodulos del repo DSRL,
+  # no de PyPI.

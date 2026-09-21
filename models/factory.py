@@ -25,7 +25,8 @@ from core.registry import LazyRegistry
 
 ModelFactory = LazyRegistry("modelo")
 
-# Registro perezoso: estas cadenas NO importan torch/lerobot hasta `create`.
+# Registro perezoso: estas cadenas NO importan torch/lerobot/JAX hasta `create`.
 ModelFactory.register("openvla", "models.OpenVLA.openvla_controller:OpenVLAController")
 ModelFactory.register("pi0", "models.Pi_zero.Pi_zero_controller:PiZeroController")
+ModelFactory.register("dsrl_pi0", "models.DSRL_pi0.dsrl_pi0_controller:DSRLPi0Controller")
 ModelFactory.register("random", "models.Random.random_controller:RandomController")
