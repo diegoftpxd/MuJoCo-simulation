@@ -13,11 +13,13 @@ cualquier pieza se puede intercambiar sin tocar las demás.
 
 ```
 MuJoCo-simulation/
-├── core/                     # Capa común: estructuras de datos + runner
+├── core/                     # Capa común: estructuras de datos, runner y contratos
 │   ├── observation.py        #   Observation, View (lo que produce un benchmark)
 │   ├── action.py             #   Action (lo que produce un modelo)
+│   ├── capabilities.py       #   Capabilities + check_compatibility (contrato modelo<->benchmark)
 │   ├── episode.py            #   StepResult, EpisodeResult, VideoRecorder, run_episode
-│   └── experiment.py         #   run_experiments, summarize
+│   ├── experiment.py         #   run_experiments, summarize
+│   └── registry.py           #   LazyRegistry (registro perezoso por nombre)
 │
 ├── robots/                   # El robot: modelo, estado, control y cinemática
 │   ├── base.py               #   RobotArm (clase base genérica) + MJCF_DIR
@@ -34,13 +36,19 @@ MuJoCo-simulation/
 │
 ├── benchmarks/               # Entornos de prueba (interfaz BenchMark)
 │   ├── benchmark.py          #   BenchMark (clase base abstracta)
+│   ├── factory.py            #   BenchmarkFactory (registro/creación por nombre)
 │   ├── example/              #   ExampleController (Panda, sin GPU ni LIBERO)
 │   └── libero/               #   LiberoController (envuelve LIBERO/robosuite)
 │
 ├── models/                   # Políticas (interfaz Model)
 │   ├── Model.py              #   Model (clase base abstracta)
+│   ├── factory.py            #   ModelFactory (registro/creación por nombre)
+│   ├── serving/              #   Servir CUALQUIER Model por HTTP (aislamiento por proceso)
+│   │   ├── server.py         #     servidor genérico (-m models.serving.server --model ...)
+│   │   ├── client.py         #     RemoteModel (implementa Model hablando HTTP)
+│   │   └── wire.py           #     serialización Observation / List[Action] (solo numpy)
 │   ├── OpenVLA/              #   OpenVLAController (VLA 7B, torch/transformers)
-│   ├── Pi_zero/              #   PiZeroController (esqueleto a completar)
+│   ├── Pi_zero/              #   PiZeroController + patches.py (flow-matching editable)
 │   └── Random/               #   RandomController (política de prueba)
 │
 ├── simulation.py             # Simulation: avance de física, viewer, render, video
@@ -56,12 +64,16 @@ MuJoCo-simulation/
 ├── demo_pick.py              # Script: secuencia pick & place con move_delta
 ├── run.py                    # Script: episodio ExampleController + RandomController
 ├── libero_test.py            # Script: OpenVLA sobre tareas de LIBERO-10
-├── openvla_experiments.ipynb # Notebook de experimentos con OpenVLA
-├── run_openvla.slurm         # Job de SLURM para correr en clúster
-├── scripts/                  # Scripts de lanzamiento (SLURM)
-│   ├── script.sh             #   Construye el env de OpenVLA/LIBERO + jupyter
-│   ├── scriptExperiment.sh   #   Sirve UN modelo (pi0/openvla) + notebook del benchmark
-│   └── scriptLLM.sh          #   Búsqueda LLM
+│
+├── openvla_experiments.ipynb        # Notebook: experimentos con OpenVLA
+├── pizero_experiments.ipynb         # Notebook: experimentos con pi0
+├── flow_matching_analisis.ipynb     # Notebook: análisis del denoising de pi0 (CSV -> cm/grados)
+├── estudio_vectores_iniciales.ipynb # Notebook: estudio del ruido inicial (clusters gaussianos)
+│
+├── scripts/                  # Jobs de SLURM + utilidades del clúster
+│   ├── experiment.sh         #   Sirve UN modelo (pi0/openvla/random) + jupyter del benchmark
+│   ├── export_action_stats.py#   Exporta las stats de des-normalización de pi0 a JSON
+│   └── export_stats.sh       #   Job SLURM que corre export_action_stats.py
 └── requirements/             # Dependencias y entornos conda
     ├── requirements.txt      #   Dependencias base (mujoco, numpy, imageio, ...)
     ├── requirements-vla.txt  #   Dependencias extra para VLA (torch, transformers)
@@ -89,6 +101,27 @@ al modelo ni el modelo conoce al benchmark: ambos hablan solo `Observation` /
   cartesiano + pinza); cada **benchmark** toma solo los campos que su robot
   soporta.
 
+### Contrato de capacidades
+
+Para que el desacople no falle en silencio, el modelo declara lo que **requiere**
+(`Model.requirements()`) y el benchmark lo que **ofrece** (`BenchMark.capabilities()`),
+ambos como `Capabilities` (vistas + estados + instrucción). `run_episode` los
+compara justo tras el `reset()`, antes de la primera inferencia: si el benchmark
+no ofrece algo que el modelo necesita, falla temprano con un mensaje
+*requiere / ofrece / falta* en vez de reventar con un error cripto de tamaño de
+tensor. Ver `core/capabilities.py`.
+
+### Aislamiento por proceso (modelos servidos por HTTP)
+
+Los stacks de los modelos son **incompatibles entre sí** (pi0/lerobot exige
+`numpy 2.x`; LIBERO/robosuite exige `numpy<2`), así que cada modelo corre en su
+propio entorno conda y se expone como **servidor HTTP** con `models/serving/`. El
+benchmark lo consume desde otro entorno con `RemoteModel`, que implementa la misma
+interfaz `Model`; por el cable solo cruzan `Observation` y `List[Action]`
+serializados con numpy (`wire.py`). Así el notebook del benchmark solo depende de
+`numpy + stdlib`, sin arrastrar torch/lerobot. Un modelo servido expone:
+`GET /health`, `GET /capabilities`, `POST /reset`, `POST /act`, `POST /context`.
+
 ---
 
 ## Clases y métodos principales
@@ -97,7 +130,7 @@ al modelo ni el modelo conoce al benchmark: ambos hablan solo `Observation` /
 
 **`Observation`** (`core/observation.py`) — dataclass que produce un benchmark.
 Superconjunto de vistas y estados; el modelo elige lo que usa.
-- `image(name)` — devuelve la vista `name` (error claro si no existe).
+- `image(name)` — devuelve la vista `name`.
 - `get_image(name, default)` / `has_image(name)` — acceso tolerante.
 - `get_state(name, default)` — lee propriocepción.
 - `view_names` (property) — vistas disponibles.
@@ -108,6 +141,22 @@ Superconjunto de vistas y estados; el modelo elige lo que usa.
 `cartesian_delta` (6 deltas), `gripper`, `joint_targets`, `raw`, `extra`.
 - `from_cartesian(delta6, gripper, raw)` (classmethod) — atajo de acción
   cartesiana + pinza.
+
+**`Capabilities`** (`core/capabilities.py`) — contrato explícito modelo↔benchmark
+(vistas + estados + instrucción). El mismo tipo describe *lo requerido* (modelo) y
+*lo ofrecido* (benchmark).
+- `of(views, state, instruction)` (classmethod).
+- `from_observation(obs)` (classmethod) — capacidades reales de una observación.
+- `missing_from(provided)`, `describe()`, `to_dict()` / `from_dict()`.
+- `check_compatibility(required, provided)` — valida; lanza
+  `IncompatibleCapabilities` con mensaje *requiere / ofrece / falta*.
+
+**`LazyRegistry`** (`core/registry.py`) — registro por nombre con importación
+**perezosa** (base de `ModelFactory` y `BenchmarkFactory`). Cada entrada puede ser
+una cadena `"paquete.modulo:Clase"` que solo se importa al crear la instancia, de
+modo que registrar un modelo no arrastra su stack pesado.
+- `register(name, target=None)` (perezoso o como decorador), `create(name, **kw)`,
+  `get(name)`, `available()`.
 
 **`core/episode.py`**
 - **`StepResult`** — dataclass: `observation`, `reward`, `done`, `info`.
@@ -192,6 +241,12 @@ escenario/tarea (una instancia) y episodio (configuración inicial dentro de la
 tarea).
 - Abstractos: `reset(episode)`, `step(action)`, `instruction` (property).
 - `num_episodes` (property), `close()`.
+- `capabilities() -> Capabilities` — lo que ofrece la `Observation` (por defecto
+  `None` = no declarado, y se valida contra la observación real).
+
+**`BenchmarkFactory`** (`benchmarks/factory.py`) — registro perezoso de
+benchmarks por nombre (instancia de `LazyRegistry`): `create("example" |
+"libero", **kwargs)`, `available()`.
 
 - **`ExampleController`** (`benchmarks/example/`) — entorno mínimo que envuelve
   la `Simulation` (Panda) para probar la arquitectura sin GPU ni LIBERO. Ofrece
@@ -204,17 +259,36 @@ tarea).
 ### `models` — políticas
 
 **`Model`** (`models/Model.py`) — clase base abstracta.
-- Abstracto: `act(observation) -> Action`.
+- Abstracto: `act(observation) -> list[Action]` (devuelve un "chunk").
 - `reset()` — reinicia estado interno entre episodios (opcional).
+- `requirements() -> Capabilities` — vistas/estados/instrucción que necesita
+  (por defecto, nada). Ver el contrato de capacidades más arriba.
 
 - **`OpenVLAController`** (`models/OpenVLA/`) — envuelve OpenVLA-7B
   (torch/transformers, imports perezosos; carga en fp16). `act(...)` elige
   su vista, predice el vector de 7 y lo devuelve como `Action`;
   `predict_action(image, instruction)` da el vector crudo des-normalizado.
-- **`PiZeroController`** (`models/Pi_zero/`) — esqueleto que sigue el mismo
-  patrón; `_load` y `predict_action` están por implementar.
+- **`PiZeroController`** (`models/Pi_zero/`) — envuelve la política `PI0Policy`
+  de LeRobot (flow-matching, action chunking). `patches.py` es el punto único
+  para modificar el algoritmo de denoising (monkeypatch de `sample_actions`) y
+  loguear el proceso a CSV; `set_context(...)` inyecta parámetros en caliente
+  (paso, escala/media del ruido inicial, etc.).
 - **`RandomController`** (`models/Random/`) — política de prueba: deltas
   cartesianos pequeños al azar. Útil para validar el pipeline sin pesos ni GPU.
+
+**`ModelFactory`** (`models/factory.py`) — registro perezoso de modelos por
+nombre (instancia de `LazyRegistry`). Agregar un modelo = una línea de registro;
+`create("openvla" | "pi0" | "random", **kwargs)`, `available()`.
+
+**Serving** (`models/serving/`) — sirve cualquier `Model` por HTTP (ver
+*Aislamiento por proceso*).
+- **`server.py`** — servidor genérico: `python -m models.serving.server --model
+  pi0 --port 9000 --device cuda`. Pasa a cada controlador solo los kwargs que
+  declara (filtrado por firma), así se mantiene genérico.
+- **`RemoteModel`** (`client.py`) — cliente que implementa `Model` hablando HTTP
+  (solo numpy + stdlib); cachea `requirements()` desde `/capabilities`.
+- **`wire.py`** — serialización de `Observation` / `List[Action]` con numpy
+  (sin pickle).
 
 ### `simulation.py` — simulación y visualización
 
@@ -241,6 +315,14 @@ robot: avanzar la física, abrir el viewer, renderizar imágenes y grabar videos
 | `demo_pick.py` | Secuencia pick & place con `move_delta` → `output/pick.mp4`. |
 | `run.py` | Episodio `ExampleController` (Panda) + `RandomController`. |
 | `libero_test.py` | OpenVLA sobre tareas de LIBERO-10 (requiere GPU + LIBERO). |
+
+### Clúster (SLURM, carpeta `scripts/`)
+
+| Script | Qué hace |
+|--------|----------|
+| `experiment.sh` | Levanta el servidor de UN modelo (`MODEL=pi0\|openvla\|random`) en su entorno conda + un Jupyter en el entorno del benchmark, que lo consume con `RemoteModel`. |
+| `export_stats.sh` | Job que corre `export_action_stats.py`. |
+| `export_action_stats.py` | Exporta a JSON las stats de des-normalización de pi0 (las usa `flow_matching_analisis.ipynb` para pasar el CSV a cm/grados). |
 
 Ejemplos:
 

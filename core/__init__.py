@@ -14,6 +14,7 @@ from .capabilities import (Capabilities, IncompatibleCapabilities,
                            check_compatibility)
 from .episode import EpisodeResult, StepResult, VideoRecorder, run_episode
 from .experiment import run_experiments, summarize
+from .interface import Interface
 from .observation import Observation, View
 from .registry import LazyRegistry
 
@@ -27,6 +28,7 @@ __all__ = [
     "VideoRecorder",
     "run_experiments",
     "summarize",
+    "Interface",
     "LazyRegistry",
     "Capabilities",
     "check_compatibility",
