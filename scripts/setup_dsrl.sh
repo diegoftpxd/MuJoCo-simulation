@@ -84,8 +84,14 @@ command -v conda >/dev/null || { echo "ERROR: no encuentro conda (revisa tu inst
 [ -f "$ENV_YML" ] || { echo "ERROR: no existe $ENV_YML (¿corres desde el repo correcto?)."; exit 1; }
 
 # --- 1) Clonar dsrl_pi0 CON submodulos (openpi + LIBERO) ------------------- #
+#     Los submodulos estan declarados con URL SSH (git@github.com:...) en
+#     .gitmodules, pero el nodo no tiene clave SSH hacia GitHub. Reescribimos
+#     SSH -> HTTPS para todas las operaciones de git (idempotente).
+git config --global url."https://github.com/".insteadOf "git@github.com:"
+
 if [ -d "$DSRL_DIR/.git" ]; then
-    echo "[1/5] repo ya existe -> actualizando submodulos"
+    echo "[1/5] repo ya existe -> sincronizando y actualizando submodulos"
+    git -C "$DSRL_DIR" submodule sync --recursive
     git -C "$DSRL_DIR" submodule update --init --recursive
 else
     echo "[1/5] clonando $DSRL_REPO -> $DSRL_DIR"
