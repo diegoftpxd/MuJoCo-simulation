@@ -3,15 +3,14 @@
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=diego.toledo@uc.cl
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=40gb
-#SBATCH --partition=ialab-low-unlimit
-#      (sin --gres: INSTALAR no necesita GPU; la verificacion CUDA se hace al servir)
-#SBATCH --qos=debug
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=5gb
+#SBATCH --partition=ialab-low
+#SBATCH --qos=regular
+#SBATCH --comment=Instala_dlrs
 #SBATCH --output=slurm/logs/%x.log
-#SBATCH --time=2:00:00                 # el pip install (jax/openpi/deps) puede tardar
-#SBATCH --nodelist=scylla
-#
+#SBATCH --time=3:00:00
+
 # setup_dsrl.sh -- crea el entorno conda `dsrl` para servir DSRL-pi0 (Opcion A).
 #
 # NECESITA INTERNET (clona el repo e instala con pip). Corre donde tu nodo tenga
