@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=40gb
 #SBATCH --partition=ialab-low-unlimit
-#SBATCH --gres=gpu:2080_ti:1           # 1 GPU: para que jax.devices() confirme CUDA
+#      (sin --gres: INSTALAR no necesita GPU; la verificacion CUDA se hace al servir)
 #SBATCH --qos=debug
 #SBATCH --output=slurm/logs/%x.log
 #SBATCH --time=2:00:00                 # el pip install (jax/openpi/deps) puede tardar
@@ -44,7 +44,9 @@ mkdir -p slurm/logs
 DSRL_REPO="${DSRL_REPO:-https://github.com/nakamotoo/dsrl_pi0.git}"
 DSRL_DIR="${DSRL_DIR:-$HOME/dsrl_pi0}"
 ENV_NAME="${ENV_NAME:-dsrl}"
-JAX_SPEC="${JAX_SPEC:-jax[cuda12]}"
+# openpi FIJA jax[cuda12]==0.5.0. NO subas de esa version: la ultima (0.10.x)
+# arrastra numpy 2.x y rompe openpi/openpi-client (que exigen numpy<2).
+JAX_SPEC="${JAX_SPEC:-jax[cuda12]==0.5.0}"
 
 # Raiz del repo de simulacion. Bajo SLURM, `sbatch` copia el script a un spool
 # (/tmp/slurmd/...), asi que BASH_SOURCE NO sirve; usamos, en orden:
@@ -110,8 +112,7 @@ echo "      python: $(which python)"
 
 # --- 3) openpi (FORK del submodulo) + jaxrl2 (repo) + deps ----------------- #
 #     IMPORTANTE: openpi va desde el submodulo (su Policy.infer acepta noise=),
-#     no desde PyPI. Instalamos las deps del repo ANTES que jax[cuda12] para que
-#     el build con CUDA sea el que quede al final (paso 4).
+#     no desde PyPI.
 echo "[3/5] instalando openpi (submodulo), jaxrl2 (repo) y requirements"
 pip install -e "$DSRL_DIR/openpi"
 pip install -e "$DSRL_DIR"
@@ -119,12 +120,19 @@ if [ -f "$DSRL_DIR/requirements.txt" ]; then
     pip install -r "$DSRL_DIR/requirements.txt"
 fi
 
-# --- 4) JAX con CUDA (ultimo, para fijar el build con GPU) ----------------- #
-echo "[4/5] instalando $JAX_SPEC"
-pip install --upgrade "$JAX_SPEC"
+# --- 4) Reconciliar las versiones que openpi FIJA -------------------------- #
+#     Los pasos anteriores (requirements/jaxrl2) pueden subir jax/numpy y romper
+#     los pines de openpi. Los reinstalamos EXACTOS AL FINAL, para que queden:
+#       jax[cuda12]==0.5.0  (con CUDA)   numpy<2   pillow>=11
+echo "[4/5] fijando versiones de openpi ($JAX_SPEC, numpy<2, pillow>=11)"
+pip install "$JAX_SPEC" "numpy>=1.26,<2.0" "pillow>=11.0.0"
 
 # --- 5) Verificacion ------------------------------------------------------- #
-echo "[5/5] verificando imports"
+#     Importa las 3 libs. Si este nodo NO tiene GPU (instalar no la necesita),
+#     jax cae a CPU y avisa "CUDA_ERROR_UNKNOWN": es ESPERADO aqui; la GPU se usa
+#     al SERVIR (scripts/experiment.sh pide la GPU). Lo que importa es que los
+#     imports funcionen y que jax quede en la version 0.5.0.
+echo "[5/5] verificando imports (CPU es normal si este nodo no tiene GPU)"
 python -c "import jax, openpi, jaxrl2; print('OK  jax', jax.__version__, '| devices:', jax.devices())"
 
 echo ""
