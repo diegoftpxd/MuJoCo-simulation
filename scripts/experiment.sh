@@ -40,7 +40,11 @@ esac
 # ya corre LIBERO; si creas uno dedicado sin deps de modelos, cambialo aqui.
 BENCH_ENV=openvla
 PORT_JUPYTER=2849
-export HF_HOME="${HF_HOME:-$PWD/hf_cache}"    # cache de pesos compartido
+export HF_HOME="${HF_HOME:-$PWD/hf_cache}"    # cache de pesos compartido (HF: openvla/pi0)
+# Base pi0 de DSRL (openpi): reutiliza la MISMA cache que el entrenamiento para no
+# re-descargar ni depender de internet al servir. Debe apuntar al mismo dir que
+# usaste en scripts/train_dsrl_libero.sh (DSRL_DATA/openpi).
+export OPENPI_DATA_HOME="${OPENPI_DATA_HOME:-$HOME/dsrl_pi0/openpi}"
 
 source ~/miniforge3/etc/profile.d/conda.sh
 mkdir -p slurm/logs
