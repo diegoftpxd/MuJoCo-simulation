@@ -74,6 +74,10 @@ echo "checkpoints -> $EXP"
 echo "cache pi0   -> $OPENPI_DATA_HOME"
 
 cd "$DSRL_DIR"
+# La raiz del repo debe estar en el path: launch_train_sim.py hace
+# `from examples.train_sim import main` (paquete `examples`), que no se resuelve si
+# corres el .py directo. Lo ejecutamos como modulo (-m) y fijamos PYTHONPATH.
+export PYTHONPATH="$DSRL_DIR:${PYTHONPATH:-}"
 
 # LIBERO exige mujoco 3.3.1 (el run_libero.sh lo instala en caliente). Solo si falta:
 if ! python -c "import mujoco,sys; sys.exit(0 if mujoco.__version__=='3.3.1' else 1)" 2>/dev/null; then
@@ -85,7 +89,7 @@ echo "Lanzando entrenamiento DSRL (seed=$SEED, max_steps=$MAX_STEPS, wandb=$WAND
 echo "Checkpoints del actor -> $EXP"
 echo "--------------------------------------------------------------------------------"
 
-python3 examples/launch_train_sim.py \
+python3 -m examples.launch_train_sim \
     --algorithm pixel_sac \
     --env libero \
     --prefix dsrl_pi0_libero \
