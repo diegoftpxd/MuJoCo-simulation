@@ -3,16 +3,15 @@
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=diego.toledo@uc.cl
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4               # DSRL es GPU-bound; 4 CPUs bastan
+#SBATCH --cpus-per-task=4
 #SBATCH --mem=40gb
-#SBATCH --partition=ialab-low-unlimit
-#SBATCH --gres=gpu:1                    # 1 GPU (NO es multi-GPU). En hydra = TITAN RTX 24GB.
+#SBATCH --partition=ialab-low
+#SBATCH --gres=gpu:1
 #SBATCH --output=slurm/logs/%x.log
-#SBATCH --time=72:00:00                 # OJO: entrenamiento LARGO (~10-30h+). NO uses
-#SBATCH --nodelist=hydra                #      qos=debug (tiene tope de tiempo bajo).
-#      (para fijar el tipo de GPU: --gres=gpu:titan_rtx:1; confirma el nombre con
-#       `scontrol show node hydra | grep -i gres`)
-#
+#SBATCH --time=24:00:00                 
+#SBATCH --nodelist=hydra
+#SBATCH --qos=regular
+
 # train_dsrl_libero.sh -- porta examples/scripts/run_libero.sh del repo dsrl_pi0 a
 # un job SLURM de kraken. Entrena el actor SAC que DSRL usa como AGENT_CKPT para
 # servir el modelo (ver scripts/experiment.sh, MODEL=dsrl_pi0).
@@ -30,7 +29,7 @@
 #     DSRL_DIR   repo dsrl_pi0            (default: ~/dsrl_pi0)
 #     ENV_NAME   entorno conda            (default: dsrl)
 #     SEED       semilla                  (default: 0)
-#     MAX_STEPS  pasos de entrenamiento   (default: 500000)
+#     MAX_STEPS  pasos de entrenamiento   (default: 300000)
 #     WANDB_MODE offline|online|disabled  (default: offline; sin login a W&B)
 
 set -euo pipefail
@@ -44,7 +43,7 @@ DSRL_DIR="${DSRL_DIR:-$HOME/dsrl_pi0}"          # codigo del repo dsrl_pi0
 DSRL_DATA="${DSRL_DATA:-$DSRL_DIR}"
 ENV_NAME="${ENV_NAME:-dsrl}"
 SEED="${SEED:-0}"
-MAX_STEPS="${MAX_STEPS:-500000}"
+MAX_STEPS="${MAX_STEPS:-300000}"
 # OJO: --checkpoint_interval por defecto es -1 en el repo (= NO guarda checkpoints).
 # Sin esto entrenas horas y no queda AGENT_CKPT. Lo forzamos (alineado con eval).
 CKPT_INTERVAL="${CKPT_INTERVAL:-10000}"
