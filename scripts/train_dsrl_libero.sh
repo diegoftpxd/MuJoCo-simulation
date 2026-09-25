@@ -7,6 +7,7 @@
 #SBATCH --mem=40gb
 #SBATCH --partition=ialab-low
 #SBATCH --gres=gpu:1
+#SBATCH --comment=Train_critic_of_dsrl
 #SBATCH --output=slurm/logs/%x.log
 #SBATCH --time=24:00:00                 
 #SBATCH --nodelist=hydra
